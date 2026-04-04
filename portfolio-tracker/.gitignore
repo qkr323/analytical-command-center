@@ -1,0 +1,33 @@
+# Environment — never commit secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Broker statement PDFs — sensitive financial data
+Statement_PDF/
+
+# Uploads (broker PDFs — sensitive)
+backend/uploads/
+
+# Docker volumes
+pgdata/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude memory files (personal notes — never commit)
+memory/
+
+# Unrelated files in repo root
+app.py
+templates/
