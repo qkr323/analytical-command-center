@@ -27,10 +27,20 @@ from __future__ import annotations
 
 import logging
 import re
+import socket
 from datetime import date, timedelta
 from decimal import Decimal
 
 from config import settings
+
+
+def _futu_reachable(host: str, port: int, timeout: float = 3.0) -> bool:
+    """Return True only if Futu OpenD is listening on host:port."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return False
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +89,12 @@ async def fetch_futu_data() -> dict:
         raise ValueError(
             "FUTU_TRADE_PASSWORD_MD5 is not set in .env.\n"
             "Run: echo -n 'YOUR_PIN' | md5   and paste the result."
+        )
+
+    if not _futu_reachable(settings.futu_host, settings.futu_port):
+        raise ValueError(
+            f"Futu OpenD is not reachable at {settings.futu_host}:{settings.futu_port}. "
+            "Make sure OpenD is running on this machine before syncing."
         )
 
     all_positions: list[dict] = []
