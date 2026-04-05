@@ -24,6 +24,7 @@ from models.transaction import Transaction, TransactionTypeEnum
 from services.brokers.ibkr_flex import fetch_flex_report, parse_flex_xml_bytes, _guess_asset_type as ibkr_guess_type
 from services.brokers.futu_opend import fetch_futu_data
 from services.brokers.binance_api import fetch_binance_data
+from services.prices import refresh_prices
 from services.compliance import check_symbol
 from services.fx import convert_to_hkd, refresh_rates
 from routers.upload import _get_or_create_asset, _tx_fingerprint
@@ -349,6 +350,17 @@ async def debug_ibkr_flex() -> dict[str, Any]:
             result["step2_get_statement"]["error"] = str(exc)
 
     return result
+
+
+@router.post("/prices")
+async def sync_prices(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """
+    Fetch latest market prices for all held assets and recalculate HKD values.
+
+    Sources: yfinance (stocks/ETFs), CoinGecko (crypto).
+    Also called automatically every 30 minutes by the scheduler.
+    """
+    return await refresh_prices(db)
 
 
 @router.post("/fx")

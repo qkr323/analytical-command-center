@@ -1,19 +1,45 @@
+import logging
 from contextlib import asynccontextmanager
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRouter
 
 from auth import require_api_key
 from config import settings
-from database import init_db
+from database import AsyncSessionLocal, init_db
 from routers import accounts, portfolio, upload, compliance, history, sync
+
+logger = logging.getLogger(__name__)
+_scheduler = AsyncIOScheduler()
+
+
+async def _scheduled_price_refresh() -> None:
+    """Background job: refresh prices every 30 minutes."""
+    try:
+        async with AsyncSessionLocal() as db:
+            from services.prices import refresh_prices
+            result = await refresh_prices(db)
+            logger.info("Scheduled price refresh: %s", result)
+    except Exception as e:
+        logger.warning("Scheduled price refresh failed: %s", e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    _scheduler.add_job(
+        _scheduled_price_refresh,
+        trigger=IntervalTrigger(minutes=30),
+        id="price_refresh",
+        replace_existing=True,
+    )
+    _scheduler.start()
+    logger.info("Price refresh scheduler started (every 30 min)")
     yield
+    _scheduler.shutdown(wait=False)
 
 
 # Allowed origins: localhost for dev, plus any configured frontend URLs

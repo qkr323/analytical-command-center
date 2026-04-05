@@ -34,5 +34,9 @@ redis[asyncio]==5.1.0
 # Broker APIs
 futu-api==9.4.5408
 
+# Live price feeds
+yfinance==0.2.54
+apscheduler==3.10.4
+
 # Utilities
 python-dateutil==2.9.0
