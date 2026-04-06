@@ -6,7 +6,7 @@ import type { PortfolioSummary, Position } from '@/types/portfolio'
 import PositionTable from '@/components/PositionTable'
 import ComplianceBadge from '@/components/ComplianceBadge'
 
-const BROKERS    = ['all', 'ibkr', 'futu', 'binance', 'sofi', 'osl']
+const BROKERS    = ['all', 'ibkr', 'futu', 'binance', 'sofi', 'osl', 'hangseng']
 const TYPES      = ['all', 'stock', 'etf_bond', 'etf_broad_index', 'etf_commodity', 'crypto', 'cash', 'bond_ust', 'bond_ukt']
 const COMPLIANCE = ['all', 'allowed', 'legacy_hold', 'review_required', 'blocked']
 
@@ -70,7 +70,7 @@ export default function PositionsPage() {
         <FilterSelect
           value={broker} onChange={setBroker}
           options={BROKERS}
-          labels={{ ibkr: 'IBKR', futu: 'Futu', binance: 'Binance', sofi: 'SoFi', osl: 'OSL' }}
+          labels={{ ibkr: 'IBKR', futu: 'Futu', binance: 'Binance', sofi: 'SoFi', osl: 'OSL', hangseng: 'Hang Seng' }}
         />
         <FilterSelect
           value={assetType} onChange={setType}

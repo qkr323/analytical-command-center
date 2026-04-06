@@ -11,6 +11,7 @@ class BrokerEnum(str, enum.Enum):
     IBKR = "ibkr"
     FUTU = "futu"
     SOFI = "sofi"
+    HANGSENG = "hangseng"
 
 
 class Account(Base):

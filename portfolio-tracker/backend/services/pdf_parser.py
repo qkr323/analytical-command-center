@@ -22,12 +22,14 @@ from services.parsers.ibkr import IBKRParser
 from services.parsers.futu import FutuParser
 from services.parsers.sofi import SoFiParser
 from services.parsers.osl import OSLParser
+from services.parsers.hangseng import HangSengParser
 
 PARSERS: dict[str, BrokerParser] = {
     "ibkr": IBKRParser(),
     "futu": FutuParser(),
     "sofi": SoFiParser(),
     "osl": OSLParser(),
+    "hangseng": HangSengParser(),
 }
 
 MIN_TEXT_LENGTH = 200  # characters; below this we consider the PDF image-based
