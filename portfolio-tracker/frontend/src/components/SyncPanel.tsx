@@ -46,9 +46,12 @@ export default function SyncPanel({ onDone }: Props) {
       onDone()
     } catch (e: unknown) {
       const raw = (e as Error).message
-      const text = btn.key === 'futu' && raw.includes('not reachable')
-        ? 'Futu requires local sync — run from your Mac terminal (see SYNC_INSTRUCTIONS.txt).'
-        : `${btn.label} failed: ${raw}`
+      const text =
+        btn.key === 'futu' && raw.includes('not reachable')
+          ? 'Futu requires local sync — run from your Mac terminal (see SYNC_INSTRUCTIONS.txt).'
+          : btn.key === 'binance'
+          ? 'Binance requires local sync — run from your Mac terminal (see SYNC_INSTRUCTIONS.txt).'
+          : `${btn.label} failed: ${raw}`
       setMessage({ text, ok: false })
     } finally {
       setLoading(null)
