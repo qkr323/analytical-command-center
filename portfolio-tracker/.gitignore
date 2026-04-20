@@ -28,6 +28,10 @@ pgdata/
 # Claude memory files (personal notes — never commit)
 memory/
 
+# Gmail OAuth2 credentials — never commit
+backend/gmail_credentials.json
+backend/gmail_token.json
+
 # Frontend
 frontend/.env.local
 frontend/node_modules/

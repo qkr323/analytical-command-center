@@ -1,0 +1,131 @@
+========================================
+  PORTFOLIO TRACKER — SYNC INSTRUCTIONS
+========================================
+
+
+PRIMARY WORKFLOW — Gmail auto-sync (Futu + SoFi)
+--------------------------------------------------
+Futu and SoFi send daily statement emails to sam.sanghyunpark@gmail.com.
+A Gmail filter forwards them to qkr323@gmail.com automatically.
+Run this once a day to pull the latest positions into the dashboard:
+
+STEP 1 — Start the local backend
+  Open a Terminal window:
+
+    cd /Users/sampark/projects/portfolio-tracker/backend
+    source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+    python -m uvicorn main:app --port 8001
+
+  Wait until you see:
+    INFO: Application startup complete.
+
+  Leave this Terminal window open.
+
+STEP 2 — Run the email sync script
+  Open a new Terminal tab (Cmd+T):
+
+    cd /Users/sampark/projects/portfolio-tracker/backend
+    source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+    python sync_from_email.py
+
+  The script will:
+    - Find any new statement emails from Futu HK and SoFi HK
+    - Download and upload the PDF to the local backend
+    - Label the email "portfolio-synced" so it won't be processed again
+    - Print a summary (positions imported, transactions imported)
+
+  First time only: a browser window will open asking you to sign in with
+  sam.sanghyunpark@gmail.com. After that, the token is saved and future
+  runs are fully automatic.
+
+STEP 3 — Refresh prices (optional, runs automatically every 30 min on Railway)
+  If you want prices refreshed immediately:
+
+    API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+    curl -X POST "http://localhost:8001/sync/prices" -H "X-API-Key: $API_KEY"
+    curl -X POST "http://localhost:8001/sync/fx"     -H "X-API-Key: $API_KEY"
+
+STEP 4 — View the dashboard
+  Open: https://analytical-command-center.vercel.app
+  Data updates immediately after syncs complete.
+
+STEP 5 — Stop the local backend
+  Go back to the Terminal window from Step 1 and press Ctrl+C.
+
+
+OTHER SYNCS
+-----------
+
+IBKR (automatic, no local app needed)
+  The website sync button works for IBKR — it calls Railway directly.
+  Or manually from local backend:
+
+    API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+    curl -X POST "http://localhost:8001/sync/ibkr" -H "X-API-Key: $API_KEY"
+
+BINANCE (must run from Mac — geoblocked on Railway)
+  Binance.com is blocked on Railway's cloud infrastructure (HTTP 451).
+  Must sync via local backend on your Mac:
+
+    API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+    curl -X POST "http://localhost:8001/sync/binance" -H "X-API-Key: $API_KEY"
+
+HANG SENG — monthly PDF upload
+  Download the monthly statement PDF from Hang Seng Bank online banking, then:
+
+    curl -X POST "http://localhost:8001/upload/statement" \
+      -H "X-API-Key: $API_KEY" \
+      -F "file=@/path/to/hangseng_statement.pdf" \
+      -F "broker=hangseng" \
+      -F "account_id=6"
+
+  Replace /path/to/hangseng_statement.pdf with the actual file path.
+  Example: -F "file=@/Users/sampark/Downloads/HS_Statement_Mar2026.pdf"
+
+OSL — monthly PDF upload
+    curl -X POST "http://localhost:8001/upload/statement" \
+      -H "X-API-Key: $API_KEY" \
+      -F "file=@/path/to/osl_statement.pdf" \
+      -F "broker=osl" \
+      -F "account_id=5"
+
+
+ACCOUNT IDs (for upload commands)
+----------------------------------
+  1 = IBKR
+  2 = Futu
+  3 = Binance
+  4 = SoFi
+  5 = OSL
+  6 = Hang Seng
+
+
+LEGACY — Futu OpenD sync (no longer primary, kept for reference)
+-----------------------------------------------------------------
+  Before the Gmail-based sync was built, Futu positions were synced via the
+  Futu OpenD local daemon. This method still works but is no longer needed
+  since daily PDF statements via email are now automated.
+
+  If you ever need to fall back to this method:
+
+  1. Open Futu OpenD from Applications. Wait for "The necessary data is ready".
+
+  2. Start the local backend (same as Step 1 above).
+
+  3. Run:
+       API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+       curl -X POST "http://localhost:8001/sync/futu" -H "X-API-Key: $API_KEY"
+
+  NOTE: The website sync button for Futu will show a friendly error message
+  (it can't reach OpenD from Railway). You must use the terminal method above.
+
+
+NOTES
+-----
+- Prices auto-refresh every 30 min on Railway — no action needed for price updates.
+- IBKR sync pulls from IBKR Flex Query API (no local IBKR Gateway needed).
+- Futu and SoFi are now automated via Gmail — no manual PDF download needed.
+- Binance must be run from Mac terminal (HTTP 451 geoblock on Railway).
+- Hang Seng and OSL have no API — upload the monthly PDF statement manually.
+- The website (Vercel + Railway) runs 24/7 — no Mac needs to be on to view it.
+- Gmail credentials: backend/gmail_credentials.json + gmail_token.json (gitignored).

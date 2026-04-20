@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio Tracker — System Diagram</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 30px 20px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.82rem;
+      color: #64748b;
+      margin-bottom: 30px;
+    }
+
+    /* ── LAYERS ── */
+    .layer {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 0;
+      flex-wrap: wrap;
+    }
+
+    .layer-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #475569;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      border-radius: 12px;
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+      min-width: 140px;
+      text-align: center;
+      border: 1.5px solid transparent;
+      user-select: none;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+    .card.active {
+      border-color: #fff !important;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
+    }
+
+    .card-icon { font-size: 1.8rem; margin-bottom: 6px; }
+    .card-title { font-size: 0.85rem; font-weight: 700; }
+    .card-sub   { font-size: 0.7rem; opacity: 0.7; margin-top: 2px; }
+
+    /* card colour themes */
+    .card.you        { background: #1e293b; border-color: #334155; }
+    .card.vercel     { background: #0d1f3c; border-color: #1e40af; }
+    .card.railway    { background: #1a0f2e; border-color: #7c3aed; }
+    .card.db         { background: #0f2318; border-color: #16a34a; }
+    .card.broker-auto { background: #1c1a0f; border-color: #ca8a04; }
+    .card.broker-pdf  { background: #1c120f; border-color: #ea580c; }
+    .card.mac         { background: #1a1f1a; border-color: #4ade80; }
+    .card.price       { background: #0f1c2e; border-color: #38bdf8; }
+    .card.github      { background: #161b22; border-color: #6e7681; }
+    .card.docker      { background: #0a1929; border-color: #2496ed; }
+    .card.local-backend { background: #1a1a0f; border-color: #f59e0b; }
+
+    /* ── SYNC INSTRUCTIONS SECTION ── */
+    .sync-section {
+      max-width: 800px;
+      margin: 40px auto 0;
+    }
+    .sync-section h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .sync-section .sync-subtitle {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 20px;
+    }
+    .sync-tabs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .sync-tab {
+      padding: 7px 18px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid #334155;
+      background: #1e293b;
+      color: #94a3b8;
+      transition: all 0.15s;
+    }
+    .sync-tab:hover { border-color: #64748b; color: #e2e8f0; }
+    .sync-tab.active { background: #f59e0b; border-color: #f59e0b; color: #000; }
+
+    .sync-content { display: none; }
+    .sync-content.active { display: block; }
+
+    .steps { list-style: none; padding: 0; }
+    .steps li {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: #f59e0b;
+      color: #000;
+      font-weight: 700;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-body { flex: 1; }
+    .step-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+    .step-desc {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+    .code-block {
+      background: #0d1117;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: #7dd3fc;
+      margin-top: 8px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .note-box {
+      background: #1c1a0f;
+      border: 1px solid #ca8a04;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #fde68a;
+      margin-top: 12px;
+      line-height: 1.6;
+    }
+    .warning-box {
+      background: #1c0f0f;
+      border: 1px solid #dc2626;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #fca5a5;
+      margin-top: 12px;
+      line-height: 1.6;
+    }
+
+    /* docker wrapper inside Railway */
+    .docker-box {
+      border: 1.5px dashed #2496ed;
+      border-radius: 10px;
+      padding: 10px 12px 12px;
+      position: relative;
+    }
+    .docker-box-label {
+      position: absolute;
+      top: -10px;
+      left: 10px;
+      background: #1a0f2e;
+      padding: 0 6px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #2496ed;
+      text-transform: uppercase;
+    }
+
+    /* ── ARROWS SVG ── */
+    svg.arrows {
+      display: block;
+      width: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    /* ── SECTION WRAPPERS ── */
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .cloud-box {
+      border: 1.5px dashed #334155;
+      border-radius: 16px;
+      padding: 16px 20px 20px;
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .cloud-box .cloud-label {
+      position: absolute;
+      top: -11px;
+      left: 16px;
+      background: #0f1117;
+      padding: 0 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .cloud-box.cloud-railway .cloud-label { color: #a78bfa; }
+    .cloud-box.cloud-vercel  .cloud-label { color: #60a5fa; }
+    .cloud-box.cloud-24      .cloud-label { color: #34d399; }
+
+    /* ── INFO PANEL ── */
+    #info-panel {
+      margin: 24px auto 0;
+      max-width: 700px;
+      background: #1e293b;
+      border: 1.5px solid #334155;
+      border-radius: 14px;
+      padding: 20px 24px;
+      min-height: 90px;
+      transition: opacity 0.2s;
+    }
+    #info-panel h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    #info-panel p {
+      font-size: 0.83rem;
+      line-height: 1.6;
+      color: #94a3b8;
+    }
+    #info-panel .tag {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .tag-auto    { background: #ca8a04; color: #000; }
+    .tag-manual  { background: #ea580c; color: #fff; }
+    .tag-cloud   { background: #7c3aed; color: #fff; }
+    .tag-always  { background: #16a34a; color: #fff; }
+
+    #info-hint {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #475569;
+      margin-top: 10px;
+    }
+
+    /* ── FLOW DIAGRAM GRID ── */
+    .diagram-grid {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .arrow-down {
+      text-align: center;
+      font-size: 1.2rem;
+      color: #475569;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .arrow-label {
+      font-size: 0.65rem;
+      color: #64748b;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .h-arrows {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 2px;
+    }
+
+    .arrow-right { color: #475569; font-size: 1.1rem; }
+
+    /* group box for brokers */
+    .broker-group {
+      border: 1.5px dashed #475569;
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .broker-group-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+    .broker-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── LEGEND ── */
+    .legend {
+      display: flex;
+      gap: 18px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 20px 0 0;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: #64748b;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Portfolio Tracker — System Diagram</h1>
+<p class="subtitle">Click any block to learn what it does</p>
+
+<div class="diagram-grid">
+
+  <!-- ROW 1: YOU -->
+  <div class="row">
+    <div class="card you" data-key="you" onclick="showInfo('you')">
+      <div class="card-icon">🧑‍💻</div>
+      <div class="card-title">You</div>
+      <div class="card-sub">Mac + Browser</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">↕</div>
+  <div class="arrow-label">Visit website / run syncs manually</div>
+
+  <!-- ROW 1b: GITHUB -->
+  <div class="row">
+    <div class="card github" data-key="github" onclick="showInfo('github')">
+      <div class="card-icon">🐙</div>
+      <div class="card-title">GitHub</div>
+      <div class="card-sub">qkr323/analytical-command-center</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">↓</div>
+  <div class="arrow-label">Push to main → auto-deploy to Vercel + Railway (Railway builds Docker image)</div>
+
+  <!-- ROW 2: CLOUD PLATFORMS (Vercel + Railway side by side) -->
+  <div class="row" style="align-items:stretch; gap: 20px;">
+
+    <!-- VERCEL -->
+    <div class="cloud-box cloud-vercel" style="flex:1; max-width:300px;">
+      <span class="cloud-label">☁️ Vercel — runs 24/7</span>
+      <div style="margin-top:6px;">
+        <div class="layer-label">Frontend</div>
+        <div style="display:flex; justify-content:center;">
+          <div class="card vercel" data-key="vercel" onclick="showInfo('vercel')">
+            <div class="card-icon">🌐</div>
+            <div class="card-title">Next.js Website</div>
+            <div class="card-sub">analytical-command-center.vercel.app</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RAILWAY -->
+    <div class="cloud-box cloud-railway" style="flex:1; max-width:340px;">
+      <span class="cloud-label">🚂 Railway — runs 24/7</span>
+      <div style="margin-top:6px;">
+        <div class="layer-label">Backend + Database</div>
+        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+          <div class="docker-box" data-key="docker" onclick="showInfo('docker')" style="cursor:pointer;">
+            <span class="docker-box-label">🐳 Docker Container</span>
+            <div class="card railway" data-key="railway" onclick="event.stopPropagation(); showInfo('railway')" style="margin-top:4px;">
+              <div class="card-icon">⚙️</div>
+              <div class="card-title">FastAPI Backend</div>
+              <div class="card-sub">API + sync logic</div>
+            </div>
+          </div>
+          <div class="card db" data-key="db" onclick="showInfo('db')">
+            <div class="card-icon">🗄️</div>
+            <div class="card-title">PostgreSQL</div>
+            <div class="card-sub">All your positions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="arrow-down">↕</div>
+  <div class="arrow-label">Prices auto-refreshed every 30 min</div>
+
+  <!-- ROW 3: PRICE FEEDS -->
+  <div class="row">
+    <div class="card price" data-key="prices" onclick="showInfo('prices')">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Price Feeds</div>
+      <div class="card-sub">yfinance · CoinGecko · frankfurter.app</div>
+    </div>
+  </div>
+
+  <div style="height: 20px;"></div>
+
+  <!-- ROW 3b: LOCAL BACKEND (middleman) -->
+  <div class="row">
+    <div class="card local-backend" data-key="local_backend" onclick="showInfo('local_backend')" style="min-width:260px;">
+      <div class="card-icon">🔌</div>
+      <div class="card-title">Local Backend (port 8001)</div>
+      <div class="card-sub">Runs on your Mac · only needed during syncs</div>
+    </div>
+  </div>
+  <div class="arrow-down">↕</div>
+  <div class="arrow-label">Middleman: handles Binance sync (geoblocked on Railway) + PDF uploads (Futu/SoFi via Gmail, Hang Seng/OSL manual) — writes results to Railway DB</div>
+
+  <div style="height: 10px;"></div>
+
+  <!-- ROW 4: BROKERS HEADING -->
+  <div class="broker-group">
+    <div class="broker-group-label">Your Brokers — data sources</div>
+    <div class="broker-row">
+      <div class="card broker-auto" data-key="ibkr" onclick="showInfo('ibkr')">
+        <div class="card-icon">🏦</div>
+        <div class="card-title">IBKR</div>
+        <div class="card-sub">Auto via API</div>
+      </div>
+      <div class="card mac" data-key="binance" onclick="showInfo('binance')">
+        <div class="card-icon">🟡</div>
+        <div class="card-title">Binance</div>
+        <div class="card-sub">Mac sync only (geoblocked on Railway)</div>
+      </div>
+      <div class="card mac" data-key="futu" onclick="showInfo('futu')">
+        <div class="card-icon">🖥️</div>
+        <div class="card-title">Futu + SoFi</div>
+        <div class="card-sub">Daily PDF via Gmail sync</div>
+      </div>
+      <div class="card broker-pdf" data-key="pdf" onclick="showInfo('pdf')">
+        <div class="card-icon">📄</div>
+        <div class="card-title">Hang Seng / OSL</div>
+        <div class="card-sub">Monthly PDF upload (manual)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLIANCE -->
+  <div style="height: 24px;"></div>
+  <div class="row">
+    <div class="card" style="background:#1a0e1a; border-color:#ec4899; min-width:200px;" data-key="compliance" onclick="showInfo('compliance')">
+      <div class="card-icon">🛡️</div>
+      <div class="card-title">Compliance Engine</div>
+      <div class="card-sub">Hedge fund rules checker</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> Railway (cloud backend)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1e40af"></div> Vercel (cloud frontend)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ca8a04"></div> Auto broker sync (IBKR — website button)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ea580c"></div> Manual PDF upload (Hang Seng / OSL)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div> Needs your Mac (Futu+SoFi via Gmail script · Binance via terminal)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2496ed"></div> Docker container</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#6e7681"></div> GitHub (source of truth)</div>
+</div>
+
+<!-- SYNC INSTRUCTIONS -->
+<div class="sync-section">
+  <h2>How to Sync Your Portfolio</h2>
+  <p class="sync-subtitle">Step-by-step instructions for each broker — click a tab to see details</p>
+
+  <div class="sync-tabs">
+    <div class="sync-tab active" onclick="switchTab('all')">Daily Routine</div>
+    <div class="sync-tab" onclick="switchTab('email')">Email Sync Setup</div>
+    <div class="sync-tab" onclick="switchTab('futu')">Futu OpenD (Legacy)</div>
+    <div class="sync-tab" onclick="switchTab('binance')">Binance Only</div>
+    <div class="sync-tab" onclick="switchTab('troubleshoot')">Troubleshooting</div>
+  </div>
+
+  <!-- DAILY ROUTINE -->
+  <div class="sync-content active" id="tab-all">
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Start the local backend (Terminal 1)</div>
+          <div class="step-desc">Opens a local copy of the backend that connects your Mac to Railway DB. Open a Terminal and run:</div>
+          <div class="code-block">cd /Users/sampark/projects/portfolio-tracker/backend
+source ../.venv/bin/activate
+python -m uvicorn main:app --port 8001</div>
+          <div class="step-desc" style="margin-top:6px;">Wait for: <strong>INFO: Application startup complete.</strong><br><strong>Leave this Terminal open — do not press Ctrl+C yet.</strong></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Run Gmail email sync — Futu + SoFi (Terminal 2 — Cmd+T)</div>
+          <div class="step-desc">The script finds new statement emails from Futu HK and SoFi HK, downloads the PDF attachments, and uploads them automatically.</div>
+          <div class="code-block">cd /Users/sampark/projects/portfolio-tracker/backend
+source ../.venv/bin/activate
+python sync_from_email.py</div>
+          <div class="step-desc" style="margin-top:6px;">Each email is labelled <strong>"portfolio-synced"</strong> after processing so it's never re-imported.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Sync IBKR + Binance + prices (same Terminal 2)</div>
+          <div class="step-desc">IBKR syncs from the website button or terminal. Binance must be terminal only (geoblocked on Railway).</div>
+          <div class="code-block">API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+
+curl -X POST "http://localhost:8001/sync/ibkr"    -H "X-API-Key: $API_KEY"
+curl -X POST "http://localhost:8001/sync/binance" -H "X-API-Key: $API_KEY"
+curl -X POST "http://localhost:8001/sync/prices"  -H "X-API-Key: $API_KEY"</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Check the dashboard</div>
+          <div class="step-desc">Open <strong>analytical-command-center.vercel.app</strong> — data updates immediately after syncs complete.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Stop the local backend when done</div>
+          <div class="step-desc">Go back to Terminal 1 and press <strong>Ctrl+C</strong>. The website keeps working — it reads from Railway, not your Mac.</div>
+        </div>
+      </li>
+    </ol>
+    <div class="note-box">Prices auto-refresh every 30 min on Railway. IBKR can also be synced from the website button directly — no local backend needed.</div>
+  </div>
+
+  <!-- EMAIL SYNC SETUP -->
+  <div class="sync-content" id="tab-email">
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">How it works</div>
+          <div class="step-desc">Futu HK (<code>no_reply@stmt.futuhk.com</code>) and SoFi HK (<code>no-reply@sofi.hk</code>) send daily statement emails with PDF attachments to <strong>sam.sanghyunpark@gmail.com</strong>.<br><br>
+          A Gmail filter auto-forwards these to <strong>qkr323@gmail.com</strong>. The script <code>sync_from_email.py</code> connects to Gmail API, downloads the PDFs, and uploads them to the backend.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Gmail credentials (one-time setup)</div>
+          <div class="step-desc">Credentials are stored at:<br>
+          <code>backend/gmail_credentials.json</code> — OAuth2 client secret (from Google Cloud Console, project "Portfolio Tracking")<br>
+          <code>backend/gmail_token.json</code> — auto-saved access/refresh token (never expires unless revoked)<br><br>
+          Both files are gitignored. To re-create if lost: Google Cloud Console → "Portfolio Tracking" project → APIs &amp; Services → Credentials → "Portfolio Sync" client → Download JSON.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">What the script does</div>
+          <div class="code-block">python sync_from_email.py</div>
+          <div class="step-desc" style="margin-top:6px;">
+          1. Searches Gmail for emails from Futu/SoFi without the "portfolio-synced" label<br>
+          2. Downloads the PDF attachment from each email<br>
+          3. POSTs to <code>http://localhost:8001/upload/statement</code> with the correct broker and account_id<br>
+          4. Labels the email "portfolio-synced" so it's never re-processed<br><br>
+          Account IDs: Futu=2, SoFi=4</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Futu PDF parser</div>
+          <div class="step-desc">The Futu daily statement PDF has 10+ pages. Positions are in the <strong>"Ending Assets Overview — Stocks"</strong> section (end-of-day prices). Some ETF names wrap across two lines (e.g. TLT, EDV, KWEB, LIT) — the parser handles this with a line-joining step before applying regex.<br><br>
+          Parser: <code>backend/services/parsers/futu.py</code><br>
+          Accounts for: all 12 positions (HK stocks, US stocks/ETFs, CNH ETF)</div>
+        </div>
+      </li>
+    </ol>
+    <div class="note-box">The gmail_token.json contains a refresh token and doesn't expire. Future runs are fully silent — no browser window needed.</div>
+  </div>
+
+  <!-- FUTU OPEND (LEGACY) -->
+  <div class="sync-content" id="tab-futu">
+    <div class="note-box" style="margin-bottom:16px;">⚠️ This method is <strong>no longer the primary workflow</strong>. Futu is now synced daily via Gmail PDF statements (see "Email Sync Setup" tab). This tab is kept for reference and as a fallback.</div>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Why we originally used Futu OpenD</div>
+          <div class="step-desc">Futu does not have a public internet API. Instead, they provide a local program called <strong>Futu OpenD</strong> that runs only on your Mac at <code>127.0.0.1:11111</code> and exposes a Python API (the <code>futu-api</code> package).<br><br>
+          The backend connects via <code>services/brokers/futu_opend.py</code>. When you trigger a sync, the local backend calls OpenD, which connects to Futu's servers, fetches positions, and writes them to the Railway DB.<br><br>
+          This worked, but required OpenD running, a local backend running, and terminal commands every time. The website sync button always failed (Railway's <code>127.0.0.1</code> is Railway's own container, not your Mac).</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Fallback: sync via OpenD if needed</div>
+          <div class="step-desc">Launch Futu OpenD from Applications. Wait until the log shows <strong>"The necessary data is ready"</strong>.</div>
+          <div class="code-block">open -a FutuOpenD</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Start local backend + run OpenD sync</div>
+          <div class="code-block"># Terminal 1 — start engine
+cd /Users/sampark/projects/portfolio-tracker/backend
+source ../.venv/bin/activate
+python -m uvicorn main:app --port 8001
+
+# Terminal 2 (Cmd+T)
+API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+curl -X POST "http://localhost:8001/sync/futu" -H "X-API-Key: $API_KEY"</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Why we switched to Gmail PDF sync</div>
+          <div class="step-desc">Futu HK sends a daily statement email to <strong>sam.sanghyunpark@gmail.com</strong> each morning with a PDF containing all positions and end-of-day prices. By reading this email via Gmail API and uploading the PDF to <code>/upload/statement</code>, we get the same data without needing OpenD running.<br><br>
+          The Futu PDF parser (<code>services/parsers/futu.py</code>) was rewritten to handle the daily statement format, including a line-join step for ETF names that wrap across lines (TLT, EDV, KWEB, LIT).</div>
+        </div>
+      </li>
+    </ol>
+    <div class="note-box">protobuf note: <code>google-api-python-client</code> requires protobuf 7.x but <code>futu-api</code> requires 3.x. Both are installed — the email sync works fine, but if you use the OpenD fallback and hit protobuf errors, pin protobuf back to 3.x temporarily.</div>
+  </div>
+
+  <!-- BINANCE ONLY -->
+  <div class="sync-content" id="tab-binance">
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Why Binance must be synced from your Mac</div>
+          <div class="step-desc">Binance.com is <strong>geoblocked on Railway's servers</strong> — Railway runs on US/EU cloud infrastructure where Binance.com is restricted. When you click the Binance button on the website, Railway tries to call Binance.com and gets a <strong>451 Unavailable For Legal Reasons</strong> error.<br><br>
+          Your Mac has no such restriction. So the fix is simple: run the sync from your Mac terminal through the local backend, which calls Binance.com directly from your home/office network.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Start the local backend + sync</div>
+          <div class="code-block"># Terminal 1 — start engine
+cd /Users/sampark/projects/portfolio-tracker/backend
+source ../.venv/bin/activate
+python -m uvicorn main:app --port 8001
+
+# Terminal 2 (Cmd+T) — run sync + prices
+API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+curl -X POST "http://localhost:8001/sync/binance" -H "X-API-Key: $API_KEY"
+curl -X POST "http://localhost:8001/sync/prices"  -H "X-API-Key: $API_KEY"</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">API key requirements</div>
+          <div class="step-desc">Your Binance API key must have <strong>Read Info</strong> permission. It does NOT need trading permissions. The key and secret live in <code>backend/.env</code> and Railway environment variables — never in GitHub.</div>
+        </div>
+      </li>
+    </ol>
+    <div class="note-box">The Binance sync button on the website will show a friendly message reminding you to run it from your Mac terminal instead.</div>
+  </div>
+
+  <!-- TROUBLESHOOTING -->
+  <div class="sync-content" id="tab-troubleshoot">
+    <ol class="steps">
+      <li>
+        <div class="step-num">!</div>
+        <div class="step-body">
+          <div class="step-title">Futu: "OpenD is not reachable at 127.0.0.1:11111"</div>
+          <div class="step-desc">Futu OpenD is not running. Open it from Applications and wait for <strong>"The necessary data is ready"</strong> before retrying.</div>
+          <div class="code-block">open -a FutuOpenD</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">!</div>
+        <div class="step-body">
+          <div class="step-title">Binance: "Request failed: 500" on the website</div>
+          <div class="step-desc">This is expected — Binance.com is geoblocked on Railway's servers (HTTP 451). <strong>You cannot sync Binance from the website button.</strong><br><br>
+          Always sync Binance from your Mac terminal:<br>
+          <code>curl -X POST "http://localhost:8001/sync/binance" -H "X-API-Key: $API_KEY"</code></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">!</div>
+        <div class="step-body">
+          <div class="step-title">"Failed to connect to localhost port 8001"</div>
+          <div class="step-desc">The local backend is not running. Go to Terminal 1 and start it:</div>
+          <div class="code-block">cd /Users/sampark/projects/portfolio-tracker/backend
+source ../.venv/bin/activate
+python -m uvicorn main:app --port 8001</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">!</div>
+        <div class="step-body">
+          <div class="step-title">Website shows old data after syncing</div>
+          <div class="step-desc">Make sure you also ran the prices sync last — this recalculates all HKD values:</div>
+          <div class="code-block">API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+curl -X POST "http://localhost:8001/sync/prices" -H "X-API-Key: $API_KEY"</div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</div>
+
+<!-- INFO PANEL -->
+<div id="info-panel">
+  <h2 id="info-title">👆 Click any block above</h2>
+  <p id="info-body">Each block in the diagram is clickable. Click one to see a plain-English explanation of what it does and how it fits into the system.</p>
+</div>
+<p id="info-hint">Click any block to see details</p>
+
+<script>
+  const INFO = {
+    you: {
+      title: "🧑‍💻 You — Mac + Browser",
+      body: `You interact with this system in two ways:<br><br>
+      <span class="tag tag-always">VIEW</span> Visit <strong>analytical-command-center.vercel.app</strong> in any browser, any time — it always works because Vercel and Railway run 24/7 without your Mac needing to be on.<br><br>
+      <span class="tag tag-manual">SYNC</span> When you want fresh position data, start the local backend (port 8001) and run <code>python sync_from_email.py</code>. This pulls Futu + SoFi daily statements from Gmail and uploads them automatically. IBKR can be synced from the website button. Binance requires a terminal command (geoblocked on Railway).`
+    },
+    vercel: {
+      title: "🌐 Next.js Website on Vercel",
+      body: `<span class="tag tag-cloud">CLOUD</span> <span class="tag tag-always">24/7</span><br><br>
+      Vercel is a hosting platform for websites. Think of it like <strong>Google Drive for websites</strong> — it keeps your site live without you doing anything.<br><br>
+      Your Next.js frontend lives here. It's what you see in the browser: the dashboard, charts, allocation tables, compliance flags.<br><br>
+      <strong>Security note:</strong> Your API key is injected server-side inside Next.js — it never reaches the browser, so it can't be stolen.`
+    },
+    railway: {
+      title: "⚙️ FastAPI Backend on Railway",
+      body: `<span class="tag tag-cloud">CLOUD</span> <span class="tag tag-always">24/7</span><br><br>
+      Railway is like <strong>renting a computer in the cloud</strong> that never turns off. Your FastAPI backend runs here.<br><br>
+      The backend is the brain of the system — it handles:<br>
+      • Syncing positions from brokers<br>
+      • Running compliance checks on every position<br>
+      • Refreshing prices every 30 minutes automatically<br>
+      • Serving data to the frontend when you visit the website<br><br>
+      Auto-deploys whenever you push code to GitHub main branch.`
+    },
+    db: {
+      title: "🗄️ PostgreSQL Database on Railway",
+      body: `<span class="tag tag-cloud">CLOUD</span> <span class="tag tag-always">24/7</span><br><br>
+      This is where all your data lives persistently — positions, prices, accounts, compliance statuses.<br><br>
+      It sits next to the FastAPI backend inside Railway. When you sync IBKR positions, they get written here. When you visit the website, the frontend reads from here.<br><br>
+      <strong>Base currency:</strong> Everything is stored in <strong>HKD</strong>. Original currencies are also stored for reference.`
+    },
+    prices: {
+      title: "📈 Price Feeds",
+      body: `The Railway backend automatically calls these services every 30 minutes to refresh market values:<br><br>
+      • <strong>yfinance</strong> — stock and ETF prices (IBKR, Futu holdings)<br>
+      • <strong>CoinGecko</strong> — crypto prices (Binance holdings)<br>
+      • <strong>frankfurter.app</strong> — FX rates to convert everything to HKD<br><br>
+      This runs in the cloud automatically — your Mac does not need to be on for prices to stay fresh.`
+    },
+    ibkr: {
+      title: "🏦 IBKR — Interactive Brokers",
+      body: `<span class="tag tag-auto">AUTO</span> No local app needed.<br><br>
+      IBKR exposes a <strong>Flex Query API</strong>. When you trigger a sync, the backend calls IBKR's servers directly over the internet and downloads your positions.<br><br>
+      <strong>Token:</strong> 193072781498344016970505 (stored in Railway env vars, never in GitHub)<br>
+      <strong>Query ID:</strong> 1458269`
+    },
+    binance: {
+      title: "🟡 Binance — Crypto Exchange",
+      body: `<span class="tag tag-manual">REQUIRES MAC</span> Must be synced from your Mac terminal.<br><br>
+      Binance has a public REST API — but <strong>Binance.com is geoblocked on Railway's servers</strong> (Railway runs on US/EU AWS, and Binance.com is restricted there). So syncing from the website button doesn't work.<br><br>
+      The fix: run the sync from your Mac terminal through the local backend. Your Mac can reach Binance.com without any restriction.<br><br>
+      <strong>To sync Binance:</strong><br>
+      1. Start local backend on port 8001<br>
+      2. Run: <code>curl -X POST "http://localhost:8001/sync/binance" -H "X-API-Key: $API_KEY"</code><br>
+      3. Then run prices sync<br><br>
+      Prices are refreshed via CoinGecko (which does work from Railway).`
+    },
+    futu: {
+      title: "🖥️ Futu + SoFi — Daily PDF via Gmail",
+      body: `<span class="tag tag-manual">REQUIRES MAC</span> Synced via daily email statements.<br><br>
+      <strong>Current method (Gmail PDF sync):</strong><br>
+      Futu HK and SoFi HK send a daily statement PDF to sam.sanghyunpark@gmail.com. A Gmail filter forwards these to qkr323@gmail.com. Running <code>python sync_from_email.py</code> downloads the PDFs and uploads them to the backend automatically.<br><br>
+      Email senders: <code>no_reply@stmt.futuhk.com</code> (Futu) · <code>no-reply@sofi.hk</code> (SoFi)<br>
+      Credentials: <code>backend/gmail_credentials.json</code> + <code>gmail_token.json</code> (gitignored)<br><br>
+      <strong>Historical method (Futu OpenD — no longer primary):</strong><br>
+      Futu also provides a local daemon called <strong>Futu OpenD</strong> that runs on your Mac at <code>127.0.0.1:11111</code>. The backend connects to it via the <code>futu-api</code> Python package. This still works as a fallback but requires OpenD running and is less automated. See the "Futu OpenD (Legacy)" sync tab for full instructions.`
+    },
+    pdf: {
+      title: "📄 Hang Seng / OSL — Monthly PDF Upload",
+      body: `<span class="tag tag-manual">MANUAL MONTHLY</span> These brokers have no API and no email statements.<br><br>
+      Each month you download the PDF from their website and upload it manually:<br>
+      <code>curl -X POST "http://localhost:8001/upload/statement" -H "X-API-Key: $API_KEY" -F "file=@statement.pdf" -F "broker=hangseng" -F "account_id=6"</code><br><br>
+      The backend has a <strong>PDF parser</strong> for each broker that reads the statement and extracts positions automatically.<br><br>
+      <strong>Hang Seng date quirk:</strong> Statements use the format <code>27MAR2026</code> — the parser handles this automatically.<br><br>
+      <strong>Note on SoFi:</strong> SoFi HK also sends daily email statements — those are now handled automatically by <code>sync_from_email.py</code>. The manual PDF upload still works as a fallback.`
+    },
+    local_backend: {
+      title: "🔌 Local Backend — the Middleman",
+      body: `<span class="tag tag-manual">RUNS ON YOUR MAC</span> Only needed when syncing.<br><br>
+      This is a local copy of the same FastAPI server that runs on Railway — but it runs on <strong>your Mac on port 8001</strong> and connects to the Railway PostgreSQL database.<br><br>
+      <strong>Why it exists:</strong> Some syncs can't run from Railway's cloud:<br>
+      • <strong>Binance</strong> — Binance.com is geoblocked on Railway (HTTP 451). Your Mac has no restriction.<br>
+      • <strong>PDF uploads</strong> — The email sync script POSTs PDFs to this local backend, which then writes positions to Railway DB.<br>
+      • <strong>Futu OpenD</strong> (legacy) — OpenD runs on your Mac; local backend was the bridge.<br><br>
+      <code>Your script → Local Backend (8001) → Railway DB</code><br><br>
+      <strong>How to start it:</strong><br>
+      <code>cd backend && source ../.venv/bin/activate && python -m uvicorn main:app --port 8001</code><br><br>
+      Keep Terminal 1 open while syncing. Press Ctrl+C when done — the website keeps working without it.`
+    },
+    github: {
+      title: "🐙 GitHub — Code Repository",
+      body: `GitHub is where your code lives. It's the <strong>single source of truth</strong> for the whole project.<br><br>
+      When you push code to the <code>main</code> branch, two things happen automatically:<br>
+      • <strong>Railway</strong> sees the new code, builds a fresh Docker image, and deploys it<br>
+      • <strong>Vercel</strong> sees the new code and deploys the updated frontend<br><br>
+      You never manually upload code to Railway or Vercel — GitHub triggers everything.<br><br>
+      <strong>Security:</strong> Secrets (API keys, DB password) are <em>never</em> stored in GitHub. They live in Railway env vars and your local <code>.env</code> file only.`
+    },
+    docker: {
+      title: "🐳 Docker Container",
+      body: `Docker is a way to <strong>package your app + everything it needs into one portable box</strong> called a container.<br><br>
+      Think of it like a lunchbox: inside it you have Python 3.12, all your pip packages (FastAPI, SQLAlchemy…), and your code — all bundled together. Railway runs this box without needing to install anything manually.<br><br>
+      <strong>How it works here:</strong><br>
+      1. You push code to GitHub<br>
+      2. Railway reads your <code>Dockerfile</code> and builds an <strong>image</strong> (the blueprint)<br>
+      3. Railway runs a <strong>container</strong> from that image (the live running box)<br>
+      4. Inside that container: your FastAPI backend starts up on port 8000<br><br>
+      <strong>Image vs Container:</strong> The image is the recipe. The container is the actual running cake.<br><br>
+      The Dockerfile lives at <code>backend/Dockerfile</code> — click the FastAPI card to learn more about what's inside it.`
+    },
+    compliance: {
+      title: "🛡️ Compliance Engine",
+      body: `Since you work at a hedge fund, you have trading restrictions. Every time positions are synced, the compliance engine checks each one:<br><br>
+      • <span class="tag tag-auto">BLOCKED</span> New single-name stocks, thematic ETFs (LIT, KWEB, ICLN…)<br>
+      • <span class="tag" style="background:#f59e0b;color:#000;">LEGACY HOLD</span> Stocks you owned before joining the firm — can hold/sell, cannot buy more<br>
+      • <span class="tag tag-always">ALLOWED</span> Broad index ETFs, bond ETFs, commodity ETFs, USTs, UKTs, crypto<br><br>
+      Unknown/ambiguous tickers get flagged in a <strong>ComplianceReview table</strong> for you to manually review.`
+    }
+  };
+
+  function switchTab(name) {
+    document.querySelectorAll('.sync-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.sync-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  let activeKey = null;
+
+  function showInfo(key) {
+    const data = INFO[key];
+    if (!data) return;
+
+    // toggle active card
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll(`[data-key="${key}"]`).forEach(c => c.classList.add('active'));
+
+    document.getElementById('info-title').textContent = data.title;
+    document.getElementById('info-body').innerHTML = data.body;
+    document.getElementById('info-hint').textContent = 'Click another block to explore, or the same block to deselect.';
+
+    activeKey = key;
+    document.getElementById('info-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+</script>
+
+</body>
+</html>

@@ -19,7 +19,6 @@ class FutuParser(BrokerParser):
     account_currency = "HKD"
 
     def parse(self, text: str, tables: list, filename: str = "") -> ParsedStatement:
-        # Determine account currency from statement text
         currency = "HKD" if "HKD" in text[:500] or "港元" in text[:500] else "USD"
 
         statement = ParsedStatement(
@@ -34,6 +33,12 @@ class FutuParser(BrokerParser):
             self._parse_vision_output(text, statement, currency)
             return statement
 
+        # Futu HK daily/monthly statement — text-based parsing
+        if "Assets Overview" in text:
+            self._parse_statement_text(text, statement)
+            return statement
+
+        # Fallback: table-based parsing for other formats
         self._parse_holdings_tables(tables, statement, currency)
         self._parse_transaction_tables(tables, statement, currency)
 
@@ -191,11 +196,160 @@ class FutuParser(BrokerParser):
                     currency=ccy or currency,
                 ))
 
+    # ── Text-based parser for Futu HK daily/monthly PDF statements ──────────────
+
+    # Two-part match: symbol at start of line, numeric data anywhere on the line.
+    # Handles long ETF names that wrap: "EDV(Vanguard Extended Duration US USD 1,000 ..."
+    _POS_SYM  = re.compile(r'^([A-Z0-9]{2,10})\(')
+    _POS_DATA = re.compile(
+        r'(?:SEHK|US|SSE|HKEX|JNST|NYSE|NASDAQ|ASX)\s+'
+        r'(HKD|USD|CNH|JPY|SGD)\s+'
+        r'([\d,]+(?:\.\d+)?)\s+'   # quantity
+        r'([\d.]+)\s+-\s+'         # price (multiplier column is always -)
+        r'([\d,]+\.\d+)',          # market value
+    )
+
+    @staticmethod
+    def _join_wrapped_lines(lines: list[str]) -> list[str]:
+        """Join lines where a symbol name was wrapped (unclosed parenthesis)."""
+        result: list[str] = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if line.count("(") > line.count(")") and i + 1 < len(lines):
+                line = line.rstrip() + " " + lines[i + 1].strip()
+                i += 2
+            else:
+                i += 1
+            result.append(line)
+        return result
+
+    def _parse_statement_text(self, text: str, stmt: ParsedStatement) -> None:
+        """Parse positions from Futu HK statement full-text."""
+        lines = self._join_wrapped_lines(text.splitlines())
+
+        ending_positions: list = []
+        starting_positions: list = []
+        current_section: str | None = None
+
+        for line in lines:
+            s = line.strip()
+
+            # Section detection
+            if "Ending Assets Overview" in s and "Stocks" in s:
+                current_section = "ending"
+                continue
+            if "Starting Assets Overview" in s and "Stocks" in s:
+                current_section = "starting"
+                continue
+            # Leave stocks section when we hit funds, transactions, or page footer
+            if current_section and any(kw in s for kw in (
+                "Assets Overview - Funds", "Transactions", "Important Notes",
+                "Cash Balance", "Preparation Date", "Starting Assets Overview",
+                "Ending Assets Overview",
+            )):
+                current_section = None
+                continue
+
+            if current_section:
+                sym_m  = self._POS_SYM.match(s)
+                data_m = self._POS_DATA.search(s)
+                if sym_m and data_m:
+                    symbol_raw = sym_m.group(1)
+                    symbol = symbol_raw.lstrip("0") or symbol_raw
+                    ccy, qty_s, price_s, value_s = data_m.groups()
+                    # Name: text between '(' and the exchange keyword, cleaned up
+                    raw_name = s[sym_m.end():data_m.start()].strip().rstrip(")").strip()
+                    pos = RawPosition(
+                        symbol=symbol,
+                        name=raw_name or None,
+                        quantity=self._safe_decimal(qty_s),
+                        price=self._safe_decimal(price_s) or None,
+                        currency=ccy,
+                        market_value=self._safe_decimal(value_s) or None,
+                        asset_type_hint=self._guess_asset_type(symbol),
+                    )
+                    if current_section == "ending":
+                        ending_positions.append(pos)
+                    else:
+                        starting_positions.append(pos)
+
+        # Prefer end-of-day positions; fall back to starting if ending section missing
+        stmt.positions.extend(ending_positions or starting_positions)
+
+        # Transactions — parse "Transactions - Stocks" section
+        self._parse_transactions_text(lines, stmt)
+
+    def _parse_transactions_text(self, lines: list[str], stmt: ParsedStatement) -> None:
+        """Extract stock transactions from Futu statement text."""
+        # Transaction data line pattern:
+        # SYMBOL(name) EXCHANGE CURRENCY DATE DATE QTY PRICE AMOUNT CHANGE
+        _TX_LINE = re.compile(
+            r'^([A-Z0-9]{2,10})\([^)]+\)\s+'
+            r'\S+\s+'                                         # exchange
+            r'(HKD|USD|CNH|JPY|SGD)\s+'                     # currency
+            r'(\d{4}/\d{2}/\d{2})\s+'                       # date/time (date part)
+            r'\S+\s+'                                         # settlement date
+            r'([\d,]+(?:\.\d+)?)\s+'                         # quantity
+            r'([\d.]+)\s+'                                   # price
+            r'([\d,]+\.\d+)'                                 # amount
+        )
+
+        in_tx_section = False
+        current_direction: str | None = None
+
+        for line in lines:
+            s = line.strip()
+
+            if "Transactions - Stocks" in s:
+                in_tx_section = True
+                continue
+            if in_tx_section and any(kw in s for kw in ("Transactions - Funds", "Important Notes", "Total Transaction")):
+                in_tx_section = False
+                continue
+
+            if not in_tx_section:
+                continue
+
+            # Direction line comes before the data line
+            if s.startswith("Buy"):
+                current_direction = "buy"
+                continue
+            if s.startswith("Sell"):
+                current_direction = "sell"
+                continue
+
+            m = _TX_LINE.match(s)
+            if m and current_direction:
+                symbol_raw, ccy, date_s, qty_s, price_s, amount_s = m.groups()
+                symbol = symbol_raw.lstrip("0") or symbol_raw
+                trade_date = self._safe_date(date_s.replace("/", "-"))
+                if trade_date:
+                    stmt.transactions.append(RawTransaction(
+                        trade_date=trade_date,
+                        tx_type=current_direction,
+                        symbol=symbol,
+                        quantity=self._safe_decimal(qty_s) or None,
+                        price=self._safe_decimal(price_s) or None,
+                        gross_amount=self._safe_decimal(amount_s) or None,
+                        fee=Decimal("0"),
+                        currency=ccy,
+                        asset_type_hint=self._guess_asset_type(symbol),
+                    ))
+                current_direction = None
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
     def _extract_account_name(self, text: str) -> str | None:
         m = re.search(r"Account\s*(?:No|Number|ID)[.:\s]+([A-Z0-9\-]+)", text, re.IGNORECASE)
         return m.group(1) if m else None
 
     def _extract_statement_date(self, text: str):
+        # Futu daily statement format: "Apr 16,2026"
+        m = re.search(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),(\d{4})", text)
+        if m:
+            return self._safe_date(f"{m.group(1)} {m.group(2)}, {m.group(3)}")
+        # Fallback: YYYY-MM-DD or DD/MM/YYYY patterns
         m = re.search(r"(?:Statement Date|报表日期)[:\s]+([\d\-/]+)", text, re.IGNORECASE)
         if m:
             return self._safe_date(m.group(1))
@@ -203,7 +357,6 @@ class FutuParser(BrokerParser):
 
     def _guess_asset_type(self, symbol: str) -> str:
         sym = (symbol or "").upper()
-        # HK stocks are numeric codes (e.g. 0700, 2800)
-        if re.match(r"^\d{4,5}(\.HK)?$", sym):
+        if re.match(r"^\d{4,6}$", sym):
             return "stock"
         return "stock"

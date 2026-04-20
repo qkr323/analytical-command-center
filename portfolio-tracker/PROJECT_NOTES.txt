@@ -1,0 +1,164 @@
+	========================================
+  PORTFOLIO TRACKER — PROJECT NOTES
+========================================
+Last updated: 2026-04-20
+
+
+WHAT IS THIS?
+-------------
+A personal portfolio management web app that aggregates all your brokerage accounts
+into one dashboard with compliance monitoring, live prices, and allocation charts.
+
+Live dashboard: https://analytical-command-center.vercel.app
+
+
+BROKERS CONNECTED
+-----------------
+  IBKR       — Flex Query API (automatic, no local app needed)
+  Futu       — Daily PDF statement via Gmail (automatic via sync_from_email.py)
+               Fallback: Futu OpenD local daemon (see HISTORY section below)
+  Binance    — REST API via local backend (geoblocked on Railway — must run from Mac)
+  SoFi       — Daily/monthly PDF statement via Gmail (automatic via sync_from_email.py)
+  OSL        — PDF upload only (manual, monthly)
+  Hang Seng  — PDF upload only (manual, monthly — download from Hang Seng online banking)
+
+
+TECH STACK
+----------
+  Backend:   FastAPI + PostgreSQL (hosted on Railway)
+  Frontend:  Next.js + Tailwind CSS + Recharts (hosted on Vercel)
+  Prices:    yfinance (stocks/ETFs), CoinGecko (crypto), frankfurter.app (FX)
+  Auth:      API key (X-API-Key header) — injected server-side, never exposed to browser
+
+
+DEPLOYMENT URLS
+---------------
+  Frontend:  https://analytical-command-center.vercel.app
+  Backend:   https://analytical-command-center-production.up.railway.app
+  GitHub:    https://github.com/qkr323/analytical-command-center
+
+  Auto-deploy: pushing to main branch deploys both Railway and Vercel automatically.
+
+
+LOCAL SETUP
+-----------
+  Backend location:   /Users/sampark/projects/portfolio-tracker/backend/
+  Virtual env:        /Users/sampark/projects/portfolio-tracker/.venv  (Python 3.12)
+  Environment file:   /Users/sampark/projects/portfolio-tracker/backend/.env  (NEVER commit this)
+
+
+SECURITY
+--------
+  All secrets (API keys, database password, broker credentials) are stored in:
+    - Railway Variables (for the live backend)
+    - backend/.env (for local use only — gitignored)
+
+  Nothing sensitive is in GitHub. The .gitignore protects:
+    - backend/.env
+    - frontend/.env.local
+    - Statement_PDF/ (broker PDFs)
+    - memory/ (these notes)
+    - backend/gmail_credentials.json  (Google OAuth2 client secret)
+    - backend/gmail_token.json        (Google OAuth2 access token)
+
+
+GMAIL-BASED SYNC (Futu + SoFi)
+--------------------------------
+  Both Futu HK and SoFi HK send daily statement emails with PDF attachments to
+  sam.sanghyunpark@gmail.com. A Gmail filter auto-forwards these to qkr323@gmail.com.
+
+  The script backend/sync_from_email.py:
+    - Connects to Gmail API (sam.sanghyunpark@gmail.com) via OAuth2
+    - Searches for unprocessed Futu and SoFi statement emails
+    - Downloads the PDF attachment
+    - Uploads it to /upload/statement on the local backend
+    - Labels the email "portfolio-synced" to avoid re-processing
+
+  Gmail credentials:
+    - backend/gmail_credentials.json  (OAuth2 client secret from Google Cloud Console)
+    - backend/gmail_token.json        (auto-saved after first browser auth — refresh token included)
+
+  Google Cloud project: "Portfolio Tracking" (console.cloud.google.com)
+  OAuth app: "Portfolio Sync" — sam.sanghyunpark@gmail.com is a test user
+
+  Email senders:
+    - no_reply@stmt.futuhk.com  → broker=futu, account_id=2
+    - no-reply@sofi.hk          → broker=sofi, account_id=4
+
+
+COMPLIANCE RULES (Hedge Fund Employee)
+----------------------------------------
+  BLOCKED:       New purchases of single-name stocks; thematic ETFs (LIT, KWEB, ICLN etc.)
+  LEGACY HOLD:   Stocks bought before joining the firm — can hold/sell, cannot buy more
+  ALLOWED:       Broad index ETFs, bond ETFs, commodity ETFs, USTs, UKTs, crypto
+
+
+WHAT RUNS 24/7 (no action needed)
+-----------------------------------
+  - Railway backend (FastAPI + PostgreSQL)
+  - Vercel frontend (Next.js)
+  - Prices auto-refresh every 30 minutes on Railway
+
+WHAT YOU RUN MANUALLY (to sync positions)
+-------------------------------------------
+  See SYNC_INSTRUCTIONS.txt
+
+
+KNOWN QUIRKS
+------------
+  - HK stock prices sometimes fail in yfinance (ticker format issues) — prices show last known value
+  - Futu daily PDF statements have long ETF names that wrap across lines — the parser handles this
+    by detecting unclosed parentheses and joining with the next line before applying regex
+  - Python 3.14 is too new — always use the .venv (Python 3.12) for the local backend
+  - Hang Seng statement date format is DDMMMYYYY (e.g. 27MAR2026) — parsed by HangSengParser
+  - Hang Seng ETFs 2800 (Tracker Fund) and 3416 (HSCEI ETF) are approved as broad index ETFs
+  - protobuf conflict: google-api-python-client requires protobuf 7.x but futu-api requires 3.x.
+    Both are installed in .venv — sync_from_email.py works fine; Futu OpenD sync may break if used.
+  - Binance is geoblocked on Railway (HTTP 451) — must sync from Mac terminal via local backend
+
+
+HISTORY — WHAT WE TRIED AND WHY WE CHANGED
+--------------------------------------------
+  FUTU SYNC — v1: Futu OpenD local daemon
+    Originally, Futu positions were synced via the Futu OpenD application — a local program that
+    runs on the Mac at 127.0.0.1:11111 and exposes a Python API (futu-api package). The backend
+    connected to it via routers/sync.py → services/brokers/futu_opend.py.
+
+    Problem: OpenD only runs locally on the Mac. Railway's cloud backend at 127.0.0.1 refers to
+    Railway's own container, not the user's Mac — so the website sync button always failed.
+    Fix applied: the sync button showed a friendly error directing to SYNC_INSTRUCTIONS.txt.
+    The workflow was: start local backend → curl /sync/futu → OpenD pulls data → writes to Railway DB.
+
+    This worked but was cumbersome — required OpenD running, local backend running, and terminal commands.
+
+  FUTU SYNC — v2: Gmail PDF statement (current)
+    Futu HK sends a daily PDF statement to sam.sanghyunpark@gmail.com each morning. A Gmail filter
+    forwards these to qkr323@gmail.com. The sync_from_email.py script reads the email, downloads the
+    PDF, and uploads it to /upload/statement.
+
+    The Futu PDF parser (services/parsers/futu.py) was rewritten to handle the daily statement format:
+    - Uses text-based parsing (pdfplumber extracts each row as a separate table with no headers)
+    - Two-step regex: _POS_SYM matches the symbol, _POS_DATA matches exchange/currency/price/value
+    - _join_wrapped_lines() handles long ETF names that wrap across lines (e.g. TLT, EDV, KWEB, LIT)
+    - Prefers "Ending Assets Overview" (end-of-day prices) over "Starting Assets Overview"
+
+  BINANCE SYNC — geoblocked on Railway
+    Binance.com is blocked on Railway's US/EU infrastructure (HTTP 451 Unavailable For Legal Reasons).
+    The website sync button was returning 500 errors. Fixed with a friendly error message in SyncPanel.tsx.
+    Binance must be synced from Mac terminal via local backend.
+
+
+WHERE CLAUDE'S NOTES ARE SAVED
+--------------------------------
+  Claude's memory about this project is saved here (not in git):
+    /Users/sampark/.claude/projects/-Users-sampark-projects/memory/
+
+  Files:
+    MEMORY.md                      — index of all notes
+    project_portfolio_tracker.md   — full project context
+    reference_deployment_ops.md    — deployment and ops details
+    reference_ibkr_flex_bugs.md    — IBKR-specific bug fixes
+    feedback_infosec.md            — security reminders
+
+  These are loaded automatically at the start of each Claude Code session.
+  You can read them any time by opening the files above in any text editor.
