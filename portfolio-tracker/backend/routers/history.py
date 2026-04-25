@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from database import get_db
 from models.position_snapshot import PositionSnapshot
@@ -25,6 +25,8 @@ class BrokerValue(BaseModel):
     value_hkd: Decimal
     source: Literal["actual", "filled_forward"]
     as_of_date: date | None = None
+
+    model_config = ConfigDict(json_encoders={Decimal: str})
 
 
 class MonthlyNAV(BaseModel):
