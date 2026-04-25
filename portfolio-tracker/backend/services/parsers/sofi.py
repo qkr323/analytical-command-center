@@ -196,6 +196,15 @@ class SoFiParser(BrokerParser):
 
         Amount may be negative with parentheses: (7.89)
         """
+        # Keywords that should never be treated as ticker symbols
+        NON_TICKER_KEYWORDS = {
+            "DIVIDE", "DIVIDEND", "DIVIDENDS", "DIV",
+            "WITHHOLDING", "WITHHOLDINGS", "TAX", "TAXES",
+            "PAYMENT", "PAYMENTS", "CASH", "INTEREST",
+            "FEE", "FEES", "EXPENSE", "WITHDRAW",
+            "DEPOSIT"
+        }
+
         section_match = re.search(
             r"Account Movement(.+?)Stock/Product Position",
             text,
@@ -235,9 +244,14 @@ class SoFiParser(BrokerParser):
             if is_negative:
                 amount = -amount
 
-            # Extract symbol from description (e.g. "VGSH:US" → "VGSH")
-            sym_match = re.match(r"([A-Z0-9]{1,6})(?::US|:HK)?", desc.upper())
+            # Extract symbol from description (e.g. "VGSH:US" → "VGSH" or "Dividend/Cash VGSH:US" → "VGSH")
+            # Look for pattern: ticker followed by :US or :HK, OR standalone ticker at end of description
+            sym_match = re.search(r"\b([A-Z0-9]{1,6})(?::US|:HK)?\b", desc.upper())
             symbol = sym_match.group(1) if sym_match else None
+
+            # Guard: reject extracted symbols that are known non-ticker keywords
+            if symbol and symbol.upper() in NON_TICKER_KEYWORDS:
+                symbol = None
 
             tx_type = self._classify_movement(tx_type_raw, desc)
 
