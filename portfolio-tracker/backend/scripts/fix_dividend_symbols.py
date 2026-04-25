@@ -55,7 +55,7 @@ def extract_ticker_from_ibkr_description(description: str) -> str | None:
 
     # Pattern 2: Look for quoted company name followed by ticker in parentheses
     # "Company Name(AAPL) Dividend"
-    match = re.search(r'\(([A-Z][A-Z0-9\.\-]{0,4})\)\s+(DIVIDEND|PAYMENT|WITHHOLDING)", desc_upper)
+    match = re.search(r'\(([A-Z][A-Z0-9\.\-]{0,4})\)\s+(DIVIDEND|PAYMENT|WITHHOLDING)', desc_upper)
     if match:
         ticker = match.group(1).rstrip('.-')
         if ticker and len(ticker) <= 5 and ticker not in NON_TICKER_KEYWORDS:
