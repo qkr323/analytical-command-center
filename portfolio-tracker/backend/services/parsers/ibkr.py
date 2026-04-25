@@ -141,6 +141,15 @@ class IBKRParser(BrokerParser):
 
     def _parse_cash_transactions(self, text: str, tables: list, stmt: ParsedStatement) -> None:
         """Parse dividends, withholding taxes, fees."""
+        # Keywords that should never be treated as ticker symbols
+        NON_TICKER_KEYWORDS = {
+            "DIVIDE", "DIVIDEND", "DIVIDENDS", "DIV",
+            "WITHHOLDING", "WITHHOLDINGS", "TAX", "TAXES",
+            "PAYMENT", "PAYMENTS", "CASH", "INTEREST",
+            "FEE", "FEES", "EXPENSE", "WITHDRAW",
+            "DEPOSIT"
+        }
+
         for table in tables:
             if not table or len(table) < 2:
                 continue
@@ -163,8 +172,13 @@ class IBKRParser(BrokerParser):
                     continue
 
                 # Extract symbol from description (e.g. "AAPL(US...) Cash Dividend")
+                # Try to match ticker symbol at start of description
                 sym_match = re.match(r"^([A-Z]{1,5})\s*[\(\-]", desc.upper())
                 symbol = sym_match.group(1) if sym_match else None
+
+                # Guard: reject extracted symbols that are known non-ticker keywords
+                if symbol and symbol.upper() in NON_TICKER_KEYWORDS:
+                    symbol = None
 
                 if "dividend" in desc:
                     tx_type = "dividend"

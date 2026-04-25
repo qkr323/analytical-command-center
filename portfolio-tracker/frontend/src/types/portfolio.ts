@@ -58,12 +58,19 @@ export interface Transaction {
   gross_amount_hkd: string | null
   fee_hkd: string | null
   net_amount_hkd: string | null
+  notes: string | null
+}
+
+export interface BrokerValue {
+  value_hkd: string
+  source: "actual" | "filled_forward"
+  as_of_date: string | null
 }
 
 export interface NavSnapshot {
   snapshot_date: string
   total_nav_hkd: string
-  by_broker: Record<string, string>
+  by_broker: Record<string, BrokerValue>
   by_asset_type: Record<string, string>
 }
 

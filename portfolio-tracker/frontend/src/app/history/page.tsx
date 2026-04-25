@@ -56,7 +56,10 @@ export default function HistoryPage() {
       fullDate: s.snapshot_date,
       total: parseFloat(s.total_nav_hkd),
     }
-    for (const [k, v] of Object.entries(s.by_broker))    row[`broker_${k}`] = parseFloat(v)
+    for (const [k, v] of Object.entries(s.by_broker)) {
+      // v is now a BrokerValue object with value_hkd, source, as_of_date
+      row[`broker_${k}`] = typeof v === 'object' ? parseFloat(v.value_hkd) : parseFloat(v as string)
+    }
     for (const [k, v] of Object.entries(s.by_asset_type)) row[`type_${k}`]  = parseFloat(v)
     return row
   })
@@ -96,6 +99,11 @@ export default function HistoryPage() {
           that you made money after accounting for new money added. True P&L (money-weighted return)
           requires transaction-level cash flow data — see the Transactions page to review what is available.
         </p>
+        {snapshots.some(s => Object.values(s.by_broker).some(v => typeof v === 'object' && v.source === 'filled_forward')) && (
+          <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-amber-200">
+            ℹ️ <strong>Futu weekend values</strong> are carried forward from Friday close. Monday statement will update.
+          </p>
+        )}
       </div>
 
       {/* Summary stats */}
@@ -208,13 +216,19 @@ export default function HistoryPage() {
                     <td className="px-4 py-2.5 text-right font-medium tabular-nums">
                       {nav.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0, style: 'currency', currency: 'HKD' })}
                     </td>
-                    {allBrokers.map(b => (
-                      <td key={b} className="px-4 py-2.5 text-right tabular-nums text-xs text-slate-500">
-                        {s.by_broker[b]
-                          ? parseFloat(s.by_broker[b]).toLocaleString('en-US', { maximumFractionDigits: 0 })
-                          : '—'}
-                      </td>
-                    ))}
+                    {allBrokers.map(b => {
+                      const brokerVal = s.by_broker[b]
+                      const val = typeof brokerVal === 'object' ? brokerVal.value_hkd : brokerVal
+                      const isFilled = typeof brokerVal === 'object' && brokerVal.source === 'filled_forward'
+                      return (
+                        <td key={b} className={`px-4 py-2.5 text-right tabular-nums text-xs ${isFilled ? 'text-amber-600 italic' : 'text-slate-500'}`}
+                          title={isFilled && brokerVal && typeof brokerVal === 'object' ? `Filled from ${brokerVal.as_of_date}` : undefined}>
+                          {val
+                            ? parseFloat(val).toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            : '—'}
+                        </td>
+                      )
+                    })}
                     <td className={`px-4 py-2.5 text-right tabular-nums text-xs font-medium
                       ${diff === null ? 'text-slate-400' : diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {diff === null ? '—' : `${diff >= 0 ? '+' : ''}${fmt(diff)}`}

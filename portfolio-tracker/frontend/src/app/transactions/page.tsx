@@ -177,43 +177,68 @@ export default function TransactionsPage() {
                   <td colSpan={10} className="px-4 py-8 text-center text-slate-400">No transactions found</td>
                 </tr>
               )}
-              {txs.map(tx => (
-                <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-2.5 text-slate-600 tabular-nums text-xs">{tx.trade_date}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium
-                      ${TYPE_COLORS[tx.tx_type] ?? 'bg-slate-100 text-slate-600'}`}>
-                      {tx.tx_type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 font-mono font-semibold text-slate-800">
-                    {tx.symbol ?? <span className="text-slate-400 font-sans font-normal text-xs">cash</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-500 uppercase text-xs">{tx.broker}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-600 text-xs">
-                    {tx.quantity
-                      ? parseFloat(tx.quantity).toLocaleString('en-US', { maximumFractionDigits: 4 })
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-600 text-xs">
-                    {tx.price
-                      ? `${tx.currency} ${parseFloat(tx.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-xs font-medium">
-                    {amt(tx.gross_amount, tx.currency)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-xs text-slate-500">
-                    {tx.fee && parseFloat(tx.fee) > 0 ? amt(tx.fee, tx.currency) : '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-xs font-medium">
-                    {amt(tx.net_amount ?? tx.gross_amount, tx.currency)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-xs text-slate-500">
-                    {hkd(tx.net_amount_hkd ?? tx.gross_amount_hkd) ?? '—'}
-                  </td>
-                </tr>
-              ))}
+              {txs.map(tx => {
+                // For dividends where symbol is DIVIDE or null, try to extract from notes
+                let displaySymbol = tx.symbol
+                let symbolNote = ""
+                if (tx.tx_type === 'dividend' && (!displaySymbol || displaySymbol === 'DIVIDE')) {
+                  const noteMatch = tx.notes?.match(/^([A-Z][A-Z0-9\.\-]{0,4})\s*[\(\-]/)
+                  if (noteMatch && noteMatch[1]) {
+                    displaySymbol = noteMatch[1]
+                    symbolNote = tx.notes ?? ""
+                  }
+                }
+
+                return (
+                  <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-2.5 text-slate-600 tabular-nums text-xs">{tx.trade_date}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium
+                        ${TYPE_COLORS[tx.tx_type] ?? 'bg-slate-100 text-slate-600'}`}>
+                        {tx.tx_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="font-mono font-semibold text-slate-800"
+                        title={symbolNote || undefined}>
+                        {displaySymbol ? (
+                          <div className="flex flex-col">
+                            <span>{displaySymbol}</span>
+                            {tx.tx_type === 'dividend' && symbolNote && (
+                              <span className="text-xs text-slate-400 font-sans font-normal">{symbolNote}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-sans font-normal text-xs">cash</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500 uppercase text-xs">{tx.broker}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-600 text-xs">
+                      {tx.quantity
+                        ? parseFloat(tx.quantity).toLocaleString('en-US', { maximumFractionDigits: 4 })
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-600 text-xs">
+                      {tx.price
+                        ? `${tx.currency} ${parseFloat(tx.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs font-medium">
+                      {amt(tx.gross_amount, tx.currency)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs text-slate-500">
+                      {tx.fee && parseFloat(tx.fee) > 0 ? amt(tx.fee, tx.currency) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs font-medium">
+                      {amt(tx.net_amount ?? tx.gross_amount, tx.currency)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs text-slate-500">
+                      {hkd(tx.net_amount_hkd ?? tx.gross_amount_hkd) ?? '—'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

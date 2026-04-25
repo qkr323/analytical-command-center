@@ -39,6 +39,7 @@ class TransactionOut(BaseModel):
     gross_amount_hkd: Decimal | None
     fee_hkd: Decimal | None
     net_amount_hkd: Decimal | None
+    notes: str | None
 
     model_config = {"from_attributes": True}
 
@@ -117,6 +118,7 @@ async def list_transactions(
             gross_amount_hkd=tx.gross_amount_hkd,
             fee_hkd=tx.fee_hkd,
             net_amount_hkd=tx.net_amount_hkd,
+            notes=tx.notes,
         )
         for tx in txs
     ]
