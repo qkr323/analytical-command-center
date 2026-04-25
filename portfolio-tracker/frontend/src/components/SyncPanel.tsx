@@ -88,6 +88,9 @@ export default function SyncPanel({ onDone }: Props) {
           {message.text}
         </p>
       )}
+      <p className="mt-3 text-xs text-slate-400">
+        OSL · Hang Seng · SoFi — synced via PDF upload or email. No sync button needed.
+      </p>
     </div>
   )
 }

@@ -27,7 +27,9 @@ class PositionOut(BaseModel):
     asset_type: str
     quantity: Decimal
     avg_cost_hkd: Decimal | None
+    last_price: Decimal | None
     last_price_hkd: Decimal | None
+    market_value_local: Decimal | None
     market_value_hkd: Decimal | None
     unrealized_pnl_hkd: Decimal | None
     unrealized_pnl_pct: Decimal | None
@@ -94,7 +96,9 @@ async def get_portfolio_summary(db: AsyncSession = Depends(get_db)):
             asset_type=asset_type,
             quantity=pos.quantity,
             avg_cost_hkd=pos.avg_cost_hkd,
+            last_price=pos.last_price,
             last_price_hkd=pos.last_price_hkd,
+            market_value_local=pos.market_value_local,
             market_value_hkd=pos.market_value_hkd,
             unrealized_pnl_hkd=pnl,
             unrealized_pnl_pct=pos.unrealized_pnl_pct,
@@ -144,7 +148,9 @@ async def list_positions(
             asset_type=p.asset.asset_type.value if p.asset else "unknown",
             quantity=p.quantity,
             avg_cost_hkd=p.avg_cost_hkd,
+            last_price=p.last_price,
             last_price_hkd=p.last_price_hkd,
+            market_value_local=p.market_value_local,
             market_value_hkd=p.market_value_hkd,
             unrealized_pnl_hkd=p.unrealized_pnl_hkd,
             unrealized_pnl_pct=p.unrealized_pnl_pct,

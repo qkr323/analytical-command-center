@@ -10,7 +10,7 @@ from fastapi.routing import APIRouter
 from auth import require_api_key
 from config import settings
 from database import AsyncSessionLocal, init_db
-from routers import accounts, portfolio, upload, compliance, history, sync
+from routers import accounts, portfolio, upload, compliance, history, sync, transactions
 
 logger = logging.getLogger(__name__)
 _scheduler = AsyncIOScheduler()
@@ -68,12 +68,13 @@ app.add_middleware(
 
 _auth = {"dependencies": [Depends(require_api_key)]}
 
-app.include_router(accounts.router,    **_auth)
-app.include_router(portfolio.router,   **_auth)
-app.include_router(upload.router,      **_auth)
-app.include_router(compliance.router,  **_auth)
-app.include_router(history.router,     **_auth)
-app.include_router(sync.router,        **_auth)
+app.include_router(accounts.router,      **_auth)
+app.include_router(portfolio.router,     **_auth)
+app.include_router(upload.router,        **_auth)
+app.include_router(compliance.router,    **_auth)
+app.include_router(history.router,       **_auth)
+app.include_router(sync.router,          **_auth)
+app.include_router(transactions.router,  **_auth)
 
 
 # Public endpoints — no API key required (health checks, uptime monitors)

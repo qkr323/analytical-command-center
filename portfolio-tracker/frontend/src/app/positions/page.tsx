@@ -83,7 +83,7 @@ export default function PositionsPage() {
         />
         <span className="ml-auto text-sm text-slate-500">
           {filtered.length} position{filtered.length !== 1 ? 's' : ''} ·
-          HK${(totalValue / 1_000_000).toFixed(2)}M
+          HK${totalValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
         </span>
       </div>
 

@@ -12,19 +12,33 @@ const TYPE_LABELS: Record<string, string> = {
   etf_thematic: 'Thematic ETF', unknown: '?',
 }
 
+function commas(v: string | null, decimals = 0): string {
+  if (!v) return '—'
+  const n = parseFloat(v)
+  if (isNaN(n)) return '—'
+  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
 function hkd(v: string | null) {
   if (!v) return '—'
   const n = parseFloat(v)
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${n.toFixed(0)}`
+  if (isNaN(n)) return '—'
+  return `HK$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function nativeVal(v: string | null, ccy: string) {
+  if (!v) return '—'
+  const n = parseFloat(v)
+  if (isNaN(n)) return '—'
+  return `${ccy} ${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
 function pnl(v: string | null, pct: string | null) {
   if (!v) return { text: '—', positive: null }
   const n = parseFloat(v)
   const p = pct ? parseFloat(pct).toFixed(2) : null
-  const text = `${n >= 0 ? '+' : ''}${hkd(v)}${p ? ` (${n >= 0 ? '+' : ''}${p}%)` : ''}`
+  const sign = n >= 0 ? '+' : ''
+  const text = `${sign}${hkd(v)}${p ? ` (${sign}${p}%)` : ''}`
   return { text, positive: n >= 0 }
 }
 
@@ -72,8 +86,10 @@ export default function PositionTable({ positions, limit }: Props) {
             </th>
             <th className="text-left py-2 pr-4 font-medium text-slate-500">Type</th>
             <th className="text-left py-2 pr-4 font-medium text-slate-500">Broker</th>
+            <th className="text-left py-2 pr-4 font-medium text-slate-500">Ccy</th>
+            <th className="text-right py-2 pr-4 font-medium text-slate-500">Native Value</th>
             <th className="text-right py-2 pr-4 font-medium">
-              <SortBtn k="market_value_hkd" label="Value (HKD)" />
+              <SortBtn k="market_value_hkd" label="HKD Value" />
             </th>
             <th className="text-right py-2 pr-4 font-medium text-slate-500">Qty</th>
             <th className="text-right py-2 pr-4 font-medium text-slate-500">Price</th>
@@ -97,14 +113,22 @@ export default function PositionTable({ positions, limit }: Props) {
                 <td className="py-2.5 pr-4 text-slate-500 uppercase text-xs">
                   {p.broker}
                 </td>
+                <td className="py-2.5 pr-4 text-slate-500 text-xs font-mono">
+                  {p.currency}
+                </td>
+                <td className="py-2.5 pr-4 text-right text-slate-500 tabular-nums text-xs">
+                  {nativeVal(p.market_value_local, p.currency)}
+                </td>
                 <td className="py-2.5 pr-4 text-right font-medium tabular-nums">
                   {hkd(p.market_value_hkd)}
                 </td>
                 <td className="py-2.5 pr-4 text-right text-slate-500 tabular-nums text-xs">
-                  {parseFloat(p.quantity).toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                  {commas(p.quantity, 4)}
                 </td>
                 <td className="py-2.5 pr-4 text-right text-slate-500 tabular-nums text-xs">
-                  {p.last_price_hkd ? `$${parseFloat(p.last_price_hkd).toFixed(2)}` : '—'}
+                  {p.last_price_hkd
+                    ? `HK$${parseFloat(p.last_price_hkd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+                    : '—'}
                 </td>
                 <td className={`py-2.5 text-right tabular-nums text-xs font-medium
                   ${positive === true ? 'text-emerald-600' : positive === false ? 'text-red-600' : 'text-slate-400'}`}>

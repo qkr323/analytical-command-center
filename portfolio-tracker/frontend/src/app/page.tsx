@@ -13,9 +13,8 @@ import Link from 'next/link'
 function fmt(v: string | null) {
   if (!v) return '—'
   const n = parseFloat(v)
-  if (n >= 1_000_000) return `HK$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `HK$${(n / 1_000).toFixed(0)}K`
-  return `HK$${n.toFixed(0)}`
+  if (isNaN(n)) return '—'
+  return `HK$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
 export default function DashboardPage() {
