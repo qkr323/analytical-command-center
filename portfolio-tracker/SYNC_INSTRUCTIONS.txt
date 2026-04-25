@@ -90,6 +90,17 @@ OSL — monthly PDF upload
       -F "account_id=5"
 
 
+RECALCULATE P&L (after importing new trades)
+----------------------------------------------
+  P&L is recalculated automatically when trades are imported via IBKR sync or PDF upload.
+  To manually trigger a full recalculation of all positions (e.g. after running the migration):
+
+    API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+    curl -X POST "http://localhost:8001/pnl/recalculate" -H "X-API-Key: $API_KEY"
+
+  Or click the "Recalculate P&L" button on the P&L page of the dashboard.
+
+
 ACCOUNT IDs (for upload commands)
 ----------------------------------
   1 = IBKR
@@ -98,6 +109,26 @@ ACCOUNT IDs (for upload commands)
   4 = SoFi
   5 = OSL
   6 = Hang Seng
+
+
+ONE-TIME SETUP — P&L Migration (run once against Railway DB)
+--------------------------------------------------------------
+  The P&L engine requires 11 new columns in the transactions table. Run this once
+  to add the columns and backfill P&L for all existing transactions:
+
+  STEP A — Add columns (safe to re-run):
+    cd /Users/sampark/projects/portfolio-tracker/backend
+    source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+    python -m uvicorn main:app --port 8001      (Terminal 1, keep open)
+
+    # Terminal 2:
+    python -m scripts.migrate_pnl_columns
+
+  STEP B — Backfill P&L for all existing transactions:
+    API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+    curl -X POST "http://localhost:8001/pnl/recalculate" -H "X-API-Key: $API_KEY"
+
+  After this one-time setup, P&L is recalculated automatically on every sync.
 
 
 LEGACY — Futu OpenD sync (no longer primary, kept for reference)
@@ -127,5 +158,6 @@ NOTES
 - Futu and SoFi are now automated via Gmail — no manual PDF download needed.
 - Binance must be run from Mac terminal (HTTP 451 geoblock on Railway).
 - Hang Seng and OSL have no API — upload the monthly PDF statement manually.
+- P&L is recalculated automatically on every sync; use POST /pnl/recalculate to trigger manually.
 - The website (Vercel + Railway) runs 24/7 — no Mac needs to be on to view it.
 - Gmail credentials: backend/gmail_credentials.json + gmail_token.json (gitignored).

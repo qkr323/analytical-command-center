@@ -1,7 +1,7 @@
 	========================================
   PORTFOLIO TRACKER — PROJECT NOTES
 ========================================
-Last updated: 2026-04-20
+Last updated: 2026-04-25
 
 
 WHAT IS THIS?
@@ -21,6 +21,16 @@ BROKERS CONNECTED
   SoFi       — Daily/monthly PDF statement via Gmail (automatic via sync_from_email.py)
   OSL        — PDF upload only (manual, monthly)
   Hang Seng  — PDF upload only (manual, monthly — download from Hang Seng online banking)
+
+
+FRONTEND PAGES (6 navigation tabs)
+------------------------------------
+  Dashboard    — Portfolio summary: total NAV, allocation charts (by broker + asset type), positions table
+  Positions    — Full position list with currency, native value, HKD equivalent, unrealized P&L
+  Transactions — Transaction history with filters (broker, type, currency, ticker, date range); paginated
+  History      — Historical portfolio value chart (area chart + by-broker + by-asset-type); NOT P&L
+  P&L          — Estimated trading P&L: realized, unrealized, dividend income, fees; data quality badges
+  Currency     — Currency exposure breakdown (assets vs cash vs total, per currency, pie chart)
 
 
 TECH STACK
@@ -104,6 +114,39 @@ WHAT YOU RUN MANUALLY (to sync positions)
   See SYNC_INSTRUCTIONS.txt
 
 
+P&L ENGINE (average-cost method)
+----------------------------------
+  The P&L engine calculates realized and unrealized trading P&L per position group (account_id, asset_id, currency).
+  It is NOT a true investment return — it does not account for deposits, withdrawals, or capital timing.
+
+  METHODOLOGY:
+    - Dual running averages: avg_cost_local (always) + avg_cost_hkd (when FX available at import time)
+    - HKD chain integrity: if any buy lacks gross_amount_hkd, avg_cost_hkd is broken for all subsequent sells
+    - Partial history: sells with no cost basis history are excluded from P&L totals (exclude_from_pnl_totals=true)
+    - Fees are included in cost basis (fees raise the average cost per unit)
+    - Grouping key: (account_id, asset_id, currency) — same asset in different currencies tracked separately
+
+  DATA QUALITY LEVELS (per broker):
+    IBKR        — high (complete: trades, dividends, fees, deposits, withdrawals)
+    Futu        — partial (trades only, history from Apr 2026)
+    SoFi        — partial (trades only)
+    Hang Seng   — partial (trades only, monthly gaps)
+    OSL         — partial (trades only)
+    Binance     — experimental (trades only, 90-day API window warning)
+
+  NEW TRANSACTION COLUMNS (added 2026-04-25):
+    realized_pnl_local, realized_pnl_hkd, cost_basis_local, cost_basis_hkd,
+    avg_cost_per_unit_local, avg_cost_per_unit_hkd, cost_basis_method,
+    calculation_version, data_quality_flag, pnl_calculated_at, exclude_from_pnl_totals
+
+  ONE-TIME SETUP (must be run once against Railway DB):
+    1. python -m scripts.migrate_pnl_columns      (adds 11 new columns — safe to re-run)
+    2. POST /pnl/recalculate                        (replays all transaction history)
+
+  P&L is automatically recalculated when new trades are imported (IBKR sync or PDF upload).
+  Manual recalculation: "Recalculate P&L" button on the P&L page, or curl command in SYNC_INSTRUCTIONS.txt.
+
+
 KNOWN QUIRKS
 ------------
   - HK stock prices sometimes fail in yfinance (ticker format issues) — prices show last known value
@@ -115,6 +158,10 @@ KNOWN QUIRKS
   - protobuf conflict: google-api-python-client requires protobuf 7.x but futu-api requires 3.x.
     Both are installed in .venv — sync_from_email.py works fine; Futu OpenD sync may break if used.
   - Binance is geoblocked on Railway (HTTP 451) — must sync from Mac terminal via local backend
+  - P&L columns require a one-time migration: run python -m scripts.migrate_pnl_columns then POST /pnl/recalculate
+    Migration script is safe to re-run (uses ADD COLUMN IF NOT EXISTS)
+  - Futu P&L history is incomplete before Apr 2026 — older trades show partial quality; sells before full history
+    are excluded from totals rather than showing misleading partial numbers
 
 
 HISTORY — WHAT WE TRIED AND WHY WE CHANGED
@@ -146,6 +193,20 @@ HISTORY — WHAT WE TRIED AND WHY WE CHANGED
     Binance.com is blocked on Railway's US/EU infrastructure (HTTP 451 Unavailable For Legal Reasons).
     The website sync button was returning 500 errors. Fixed with a friendly error message in SyncPanel.tsx.
     Binance must be synced from Mac terminal via local backend.
+
+
+HISTORY — SESSION LOG
+----------------------
+  2026-04-25: Added Transactions, History, Currency, and P&L pages. Added P&L engine (average-cost
+              method, dual HKD running averages, data quality flags). Added 11 new transaction columns.
+              Added migration script (backend/scripts/migrate_pnl_columns.py). Updated NavBar with active
+              link highlighting. Added DataQualityBanner component. Added thousands separators and
+              currency column to positions table. IBKR/upload sync now triggers automatic P&L recalc.
+
+  2026-04-20: Added Hang Seng Bank broker (PDF parser, model enum, frontend filter tab).
+              Futu sync migrated to Gmail PDF statement method (replaced Futu OpenD as primary).
+              Added sync_from_email.py for automated Futu + SoFi daily PDF sync.
+              Binance geoblocked on Railway — sync must run from Mac terminal.
 
 
 WHERE CLAUDE'S NOTES ARE SAVED

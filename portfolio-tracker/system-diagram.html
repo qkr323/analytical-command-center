@@ -421,7 +421,7 @@
           <div class="card vercel" data-key="vercel" onclick="showInfo('vercel')">
             <div class="card-icon">🌐</div>
             <div class="card-title">Next.js Website</div>
-            <div class="card-sub">analytical-command-center.vercel.app</div>
+            <div class="card-sub">analytical-command-center.vercel.app · 6 pages</div>
           </div>
         </div>
       </div>
@@ -438,7 +438,7 @@
             <div class="card railway" data-key="railway" onclick="event.stopPropagation(); showInfo('railway')" style="margin-top:4px;">
               <div class="card-icon">⚙️</div>
               <div class="card-title">FastAPI Backend</div>
-              <div class="card-sub">API + sync logic</div>
+              <div class="card-sub">API + sync logic + P&L engine</div>
             </div>
           </div>
           <div class="card db" data-key="db" onclick="showInfo('db')">
@@ -539,6 +539,7 @@
     <div class="sync-tab" onclick="switchTab('email')">Email Sync Setup</div>
     <div class="sync-tab" onclick="switchTab('futu')">Futu OpenD (Legacy)</div>
     <div class="sync-tab" onclick="switchTab('binance')">Binance Only</div>
+    <div class="sync-tab" onclick="switchTab('pnl')">P&L Recalculate</div>
     <div class="sync-tab" onclick="switchTab('troubleshoot')">Troubleshooting</div>
   </div>
 
@@ -728,6 +729,40 @@ curl -X POST "http://localhost:8001/sync/prices"  -H "X-API-Key: $API_KEY"</div>
     <div class="note-box">The Binance sync button on the website will show a friendly message reminding you to run it from your Mac terminal instead.</div>
   </div>
 
+  <!-- P&L RECALCULATE -->
+  <div class="sync-content" id="tab-pnl">
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">One-time setup — add P&L columns to the database</div>
+          <div class="step-desc">Run once to add 11 new columns to the transactions table. Safe to re-run (uses ADD COLUMN IF NOT EXISTS).</div>
+          <div class="code-block">cd /Users/sampark/projects/portfolio-tracker/backend
+source ../.venv/bin/activate
+python -m scripts.migrate_pnl_columns</div>
+          <div class="step-desc" style="margin-top:6px;">Requires the local backend to be running (Terminal 1) so it can connect to Railway DB.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Backfill P&L for all existing transactions</div>
+          <div class="step-desc">Replays all transaction history using the average-cost method to populate P&L columns. Run once after migration, then automatically triggered on every sync.</div>
+          <div class="code-block">API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
+curl -X POST "http://localhost:8001/pnl/recalculate" -H "X-API-Key: $API_KEY"</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Manual recalculation (ongoing)</div>
+          <div class="step-desc">P&L is recalculated automatically whenever you import trades (IBKR sync or PDF upload). To trigger manually, use the command above or click the <strong>"Recalculate P&L"</strong> button on the P&L page.</div>
+        </div>
+      </li>
+    </ol>
+    <div class="note-box">⚠️ P&L numbers are <strong>estimated trading P&L only</strong> — realized gains/losses using average-cost method + current unrealized mark-to-market. They do NOT account for deposits, withdrawals, or capital timing. Dividend data is IBKR only.</div>
+  </div>
+
   <!-- TROUBLESHOOTING -->
   <div class="sync-content" id="tab-troubleshoot">
     <ol class="steps">
@@ -783,14 +818,21 @@ curl -X POST "http://localhost:8001/sync/prices" -H "X-API-Key: $API_KEY"</div>
     you: {
       title: "🧑‍💻 You — Mac + Browser",
       body: `You interact with this system in two ways:<br><br>
-      <span class="tag tag-always">VIEW</span> Visit <strong>analytical-command-center.vercel.app</strong> in any browser, any time — it always works because Vercel and Railway run 24/7 without your Mac needing to be on.<br><br>
-      <span class="tag tag-manual">SYNC</span> When you want fresh position data, start the local backend (port 8001) and run <code>python sync_from_email.py</code>. This pulls Futu + SoFi daily statements from Gmail and uploads them automatically. IBKR can be synced from the website button. Binance requires a terminal command (geoblocked on Railway).`
+      <span class="tag tag-always">VIEW</span> Visit <strong>analytical-command-center.vercel.app</strong> in any browser, any time — 6 pages: Dashboard, Positions, Transactions, History, P&L, Currency.<br><br>
+      <span class="tag tag-manual">SYNC</span> When you want fresh position data, start the local backend (port 8001) and run <code>python sync_from_email.py</code>. This pulls Futu + SoFi daily statements from Gmail and uploads them automatically. IBKR can be synced from the website button. Binance requires a terminal command (geoblocked on Railway).<br><br>
+      P&L is recalculated automatically on every sync. Use the "Recalculate P&L" button on the P&L page to trigger manually.`
     },
     vercel: {
       title: "🌐 Next.js Website on Vercel",
       body: `<span class="tag tag-cloud">CLOUD</span> <span class="tag tag-always">24/7</span><br><br>
       Vercel is a hosting platform for websites. Think of it like <strong>Google Drive for websites</strong> — it keeps your site live without you doing anything.<br><br>
-      Your Next.js frontend lives here. It's what you see in the browser: the dashboard, charts, allocation tables, compliance flags.<br><br>
+      Your Next.js frontend lives here with 6 pages:<br>
+      • <strong>Dashboard</strong> — total NAV, allocation charts, positions table<br>
+      • <strong>Positions</strong> — full position list with currency, native value, HKD equivalent, unrealized P&L<br>
+      • <strong>Transactions</strong> — transaction history with filters; paginated<br>
+      • <strong>History</strong> — historical portfolio value chart (area + by broker + by asset type)<br>
+      • <strong>P&L</strong> — estimated trading P&L: realized, unrealized, dividend income, data quality badges<br>
+      • <strong>Currency</strong> — currency exposure breakdown (assets vs cash vs total, per currency)<br><br>
       <strong>Security note:</strong> Your API key is injected server-side inside Next.js — it never reaches the browser, so it can't be stolen.`
     },
     railway: {
@@ -801,7 +843,9 @@ curl -X POST "http://localhost:8001/sync/prices" -H "X-API-Key: $API_KEY"</div>
       • Syncing positions from brokers<br>
       • Running compliance checks on every position<br>
       • Refreshing prices every 30 minutes automatically<br>
-      • Serving data to the frontend when you visit the website<br><br>
+      • Serving data to the frontend when you visit the website<br>
+      • <strong>P&L engine</strong> — average-cost method; dual HKD running averages; data quality flags per broker<br><br>
+      P&L is recalculated automatically whenever trades are imported. Endpoints: GET /pnl/summary, GET /pnl/data-quality, POST /pnl/recalculate.<br><br>
       Auto-deploys whenever you push code to GitHub main branch.`
     },
     db: {
@@ -889,6 +933,23 @@ curl -X POST "http://localhost:8001/sync/prices" -H "X-API-Key: $API_KEY"</div>
       4. Inside that container: your FastAPI backend starts up on port 8000<br><br>
       <strong>Image vs Container:</strong> The image is the recipe. The container is the actual running cake.<br><br>
       The Dockerfile lives at <code>backend/Dockerfile</code> — click the FastAPI card to learn more about what's inside it.`
+    },
+    pnl_engine: {
+      title: "📊 P&L Engine — Estimated Trading P&L",
+      body: `The P&L engine calculates realized and unrealized trading gains/losses per position group.<br><br>
+      <strong>Methodology:</strong><br>
+      • Average-cost method (not FIFO)<br>
+      • Dual running averages: local currency + HKD tracked independently<br>
+      • HKD chain integrity: if any buy lacks FX data, HKD P&L is broken for all subsequent sells<br>
+      • Partial history sells are excluded from totals (not shown as zero — excluded entirely)<br>
+      • Fees are included in cost basis (raise avg cost per unit)<br>
+      • Grouping key: (account_id, asset_id, currency)<br><br>
+      <strong>Data quality per broker:</strong><br>
+      • IBKR — Complete (trades, dividends, fees, deposits, withdrawals)<br>
+      • Futu — Partial (trades only, from Apr 2026)<br>
+      • SoFi / Hang Seng / OSL — Partial (trades only)<br>
+      • Binance — Experimental (trades only, 90-day API window)<br><br>
+      <strong>One-time setup required:</strong> run <code>python -m scripts.migrate_pnl_columns</code> then <code>POST /pnl/recalculate</code>`
     },
     compliance: {
       title: "🛡️ Compliance Engine",
