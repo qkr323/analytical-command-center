@@ -39,6 +39,15 @@ export const api = {
   getNavHistory: () =>
     request<import('@/types/portfolio').NavSnapshot[]>('history/snapshots'),
 
+  getPnlSummary: () =>
+    request<import('@/types/portfolio').PnlSummary>('pnl/summary'),
+
+  getDataQuality: () =>
+    request<import('@/types/portfolio').DataQuality[]>('pnl/data-quality'),
+
+  recalculatePnl: () =>
+    request<{ groups_processed: number; status: string }>('pnl/recalculate', 'POST'),
+
   syncIBKR:   () => request<import('@/types/portfolio').SyncResult>('sync/ibkr',   'POST'),
   syncFutu:   () => request<import('@/types/portfolio').SyncResult>('sync/futu',   'POST'),
   syncBinance:() => request<import('@/types/portfolio').SyncResult>('sync/binance','POST'),

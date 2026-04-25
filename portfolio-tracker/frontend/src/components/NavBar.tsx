@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: '/positions',    label: 'Positions'   },
   { href: '/transactions', label: 'Transactions'},
   { href: '/history',      label: 'History'     },
+  { href: '/pnl',          label: 'P&L'         },
   { href: '/currency',     label: 'Currency'    },
 ]
 

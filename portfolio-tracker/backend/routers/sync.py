@@ -70,8 +70,15 @@ async def sync_ibkr(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
         await _upsert_cash(db, account.id, cash, snapshot_date, summary)
 
     # Process trades
+    pnl_pairs: set[tuple[int, int, str]] = set()
     for trade in report["trades"]:
-        await _upsert_trade_from_ibkr(db, account.id, trade, summary)
+        pair = await _upsert_trade_from_ibkr(db, account.id, trade, summary)
+        if pair:
+            pnl_pairs.add(pair)
+
+    if pnl_pairs:
+        from services.pnl import recalculate_pnl_for_pairs
+        await recalculate_pnl_for_pairs(db, pnl_pairs)
 
     await db.commit()
     summary.pop("_seen", None)
@@ -120,8 +127,15 @@ async def sync_ibkr_xml(
     for cash in report["cash"]:
         await _upsert_cash(db, account.id, cash, snapshot_date, summary)
 
+    pnl_pairs: set[tuple[int, int, str]] = set()
     for trade in report["trades"]:
-        await _upsert_trade_from_ibkr(db, account.id, trade, summary)
+        pair = await _upsert_trade_from_ibkr(db, account.id, trade, summary)
+        if pair:
+            pnl_pairs.add(pair)
+
+    if pnl_pairs:
+        from services.pnl import recalculate_pnl_for_pairs
+        await recalculate_pnl_for_pairs(db, pnl_pairs)
 
     await db.commit()
     summary.pop("_seen", None)
@@ -489,12 +503,18 @@ async def _upsert_position_from_ibkr(
                            pos["quantity"], price_hkd, value_hkd, "ibkr_flex_api")
 
 
-async def _upsert_trade_from_ibkr(db, account_id: int, trade: dict, summary: dict) -> None:
+async def _upsert_trade_from_ibkr(
+    db, account_id: int, trade: dict, summary: dict
+) -> tuple[int, int, str] | None:
+    """Insert IBKR trade if not already present.
+
+    Returns (account_id, asset_id, currency) for P&L recalculation on new inserts.
+    """
     hint = ibkr_guess_type(trade["asset_category"], trade.get("name", ""))
     asset, _ = await _get_or_create_asset(db, trade["symbol"], trade.get("name"), trade["currency"], hint)
 
     if asset.compliance_status == ComplianceStatusEnum.BLOCKED:
-        return
+        return None
 
     raw = RawTransaction(
         trade_date=trade["trade_date"],
@@ -513,7 +533,7 @@ async def _upsert_trade_from_ibkr(db, account_id: int, trade: dict, summary: dic
     existing = await db.scalar(select(Transaction).where(Transaction.fingerprint == fingerprint))
     if existing:
         summary["transactions_skipped_duplicate"] += 1
-        return
+        return None
 
     tx_type = TransactionTypeEnum.BUY if trade["tx_type"] == "buy" else TransactionTypeEnum.SELL
     price_hkd, fx_rate = await convert_to_hkd(db, trade["price"], trade["currency"], trade["trade_date"])
@@ -533,6 +553,7 @@ async def _upsert_trade_from_ibkr(db, account_id: int, trade: dict, summary: dic
         source_file="ibkr_flex_api", fingerprint=fingerprint,
     ))
     summary["transactions_imported"] += 1
+    return (account_id, asset.id, trade["currency"])
 
 
 # ── Futu helpers ──────────────────────────────────────────────────────────────

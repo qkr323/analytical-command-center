@@ -90,8 +90,15 @@ async def upload_statement(
     for raw_pos in parsed.positions:
         await _process_position(db, account_id, raw_pos, file.filename, snapshot_date, summary)
 
+    pnl_pairs: set[tuple[int, int, str]] = set()
     for raw_tx in parsed.transactions:
-        await _process_transaction(db, account_id, raw_tx, file.filename, summary)
+        pair = await _process_transaction(db, account_id, raw_tx, file.filename, summary)
+        if pair:
+            pnl_pairs.add(pair)
+
+    if pnl_pairs:
+        from services.pnl import recalculate_pnl_for_pairs
+        await recalculate_pnl_for_pairs(db, pnl_pairs)
 
     await db.commit()
     return summary
@@ -244,12 +251,17 @@ async def _process_transaction(
     raw: RawTransaction,
     filename: str,
     summary: dict,
-) -> None:
+) -> tuple[int, int, str] | None:
+    """Insert a transaction if not already present.
+
+    Returns (account_id, asset_id, currency) for P&L recalculation
+    when a buy or sell is newly inserted, or None otherwise.
+    """
     asset_id = None
     if raw.symbol:
         asset, _ = await _get_or_create_asset(db, raw.symbol, None, raw.currency, raw.asset_type_hint)
         if asset.compliance_status == ComplianceStatusEnum.BLOCKED:
-            return
+            return None
         asset_id = asset.id
 
     fingerprint = _tx_fingerprint(account_id, raw)
@@ -260,7 +272,7 @@ async def _process_transaction(
     )
     if existing:
         summary["transactions_skipped_duplicate"] += 1
-        return
+        return None
 
     type_map = {
         "buy": TransactionTypeEnum.BUY,
@@ -303,3 +315,8 @@ async def _process_transaction(
     ))
 
     summary["transactions_imported"] += 1
+
+    # Return pair for P&L recalculation only when a trade was inserted
+    if tx_type_enum in (TransactionTypeEnum.BUY, TransactionTypeEnum.SELL) and asset_id:
+        return (account_id, asset_id, raw.currency)
+    return None

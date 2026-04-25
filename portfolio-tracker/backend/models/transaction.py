@@ -46,6 +46,19 @@ class Transaction(Base):
     fee_hkd: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
     net_amount_hkd: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
 
+    # Realized P&L — populated by services/pnl.py using average-cost method
+    realized_pnl_local: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    realized_pnl_hkd: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    cost_basis_local: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    cost_basis_hkd: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    avg_cost_per_unit_local: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    avg_cost_per_unit_hkd: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    cost_basis_method: Mapped[str | None] = mapped_column(String(50))
+    calculation_version: Mapped[str | None] = mapped_column(String(20))
+    data_quality_flag: Mapped[str | None] = mapped_column(String(50))
+    pnl_calculated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    exclude_from_pnl_totals: Mapped[bool] = mapped_column(default=False, server_default="false")
+
     # Audit
     source_file: Mapped[str | None] = mapped_column(String(255))
     notes: Mapped[str | None] = mapped_column(Text)
