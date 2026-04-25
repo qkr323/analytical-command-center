@@ -31,11 +31,12 @@ NON_TICKER_KEYWORDS = {
 
 
 def extract_ticker_from_ibkr_description(description: str) -> str | None:
-    """Extract ticker from IBKR dividend description.
+    """Extract ticker from IBKR/SoFi dividend description.
 
     Examples:
-      "AAPL(US0378161474) Cash Dividend USD 0.24" -> "AAPL"
-      "Apple Inc(AAPL) Dividend" -> "AAPL"
+      "AAPL(US0378161474) Cash Dividend USD 0.24" -> "AAPL"  (IBKR)
+      "Dividend/Cash VGSH:US Cash Dividend" -> "VGSH"  (SoFi)
+      "Dividend tax AGNC:US Cash Dividend" -> "AGNC"  (SoFi)
       "BRK.B(US0311001004) Cash Dividend" -> "BRK"  (gets first 5 chars before non-alpha)
     """
     if not description:
@@ -43,7 +44,15 @@ def extract_ticker_from_ibkr_description(description: str) -> str | None:
 
     desc_upper = description.upper()
 
-    # Pattern 1: Ticker followed by parenthesis with CUSIP/ISIN
+    # Pattern 1: SoFi format — ticker:US or ticker:HK
+    # "Dividend/Cash VGSH:US Cash Dividend"
+    match = re.search(r'\b([A-Z][A-Z0-9\.\-]{0,4}):(?:US|HK)\b', desc_upper)
+    if match:
+        ticker = match.group(1).rstrip('.-')
+        if ticker and len(ticker) <= 5 and ticker not in NON_TICKER_KEYWORDS:
+            return ticker
+
+    # Pattern 2: IBKR format — Ticker followed by parenthesis with CUSIP/ISIN
     # "AAPL(US0378...)" or "BRK.B(US...)"
     match = re.match(r"^([A-Z][A-Z0-9\.\-]{0,4})\s*[\(\-]", desc_upper)
     if match:
@@ -53,9 +62,9 @@ def extract_ticker_from_ibkr_description(description: str) -> str | None:
         if ticker and len(ticker) <= 5 and ticker not in NON_TICKER_KEYWORDS:
             return ticker
 
-    # Pattern 2: Look for quoted company name followed by ticker in parentheses
+    # Pattern 3: Look for ticker in parentheses
     # "Company Name(AAPL) Dividend"
-    match = re.search(r'\(([A-Z][A-Z0-9\.\-]{0,4})\)\s+(DIVIDEND|PAYMENT|WITHHOLDING)', desc_upper)
+    match = re.search(r'\(([A-Z][A-Z0-9\.\-]{0,4})\)\s+(?:DIVIDEND|PAYMENT|WITHHOLDING)', desc_upper)
     if match:
         ticker = match.group(1).rstrip('.-')
         if ticker and len(ticker) <= 5 and ticker not in NON_TICKER_KEYWORDS:
