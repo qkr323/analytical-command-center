@@ -93,7 +93,7 @@ async def get_pnl_summary(db: AsyncSession = Depends(get_db)) -> PnlSummary:
         .group_by(Account.broker)
     )
     realized_by_broker = {
-        str(r.broker): {
+        r.broker.value: {
             "realized": r.realized,
             "total": int(r.total_sells or 0),
             "included": int(r.included_sells or 0),
@@ -112,7 +112,7 @@ async def get_pnl_summary(db: AsyncSession = Depends(get_db)) -> PnlSummary:
         .group_by(Account.broker)
     )
     unrealized_by_broker = {
-        str(r.broker): r.unrealized or Decimal("0")
+        r.broker.value: r.unrealized or Decimal("0")
         for r in unreal_result
     }
 
@@ -132,10 +132,10 @@ async def get_pnl_summary(db: AsyncSession = Depends(get_db)) -> PnlSummary:
     dividends_by_broker: dict[str, Decimal] = {}
     fees_by_broker: dict[str, Decimal] = {}
     for r in income_result:
-        broker = str(r.broker)
-        if str(r.tx_type) == "dividend":
+        broker = r.broker.value
+        if r.tx_type == TransactionTypeEnum.DIVIDEND:
             dividends_by_broker[broker] = r.total or Decimal("0")
-        elif str(r.tx_type) == "fee":
+        elif r.tx_type == TransactionTypeEnum.FEE:
             fees_by_broker[broker] = r.total or Decimal("0")
 
     # ── Data quality info ─────────────────────────────────────────────────
