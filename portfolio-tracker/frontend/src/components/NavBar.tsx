@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: '/history',      label: 'History'     },
   { href: '/pnl',          label: 'P&L'         },
   { href: '/currency',     label: 'Currency'    },
+  { href: '/retirement',   label: 'Retirement'  },
 ]
 
 export default function NavBar() {
