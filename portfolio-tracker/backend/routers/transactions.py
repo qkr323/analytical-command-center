@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from database import get_db
-from models.account import Account
+from models.account import Account, BrokerEnum
 from models.asset import Asset
 from models.transaction import Transaction, TransactionTypeEnum
 
@@ -69,9 +69,13 @@ async def list_transactions(
     if account_id is not None:
         query = query.where(Transaction.account_id == account_id)
     elif broker:
-        query = query.join(Account, Transaction.account_id == Account.id).where(
-            Account.broker == broker
-        )
+        try:
+            broker_enum = BrokerEnum(broker.lower())
+            query = query.join(Account, Transaction.account_id == Account.id).where(
+                Account.broker == broker_enum
+            )
+        except ValueError:
+            pass
 
     if symbol:
         query = query.join(Asset, Transaction.asset_id == Asset.id).where(

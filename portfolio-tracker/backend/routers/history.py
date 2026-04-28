@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from database import get_db
 from models.position_snapshot import PositionSnapshot
@@ -26,7 +26,9 @@ class BrokerValue(BaseModel):
     source: Literal["actual", "filled_forward"]
     as_of_date: date | None = None
 
-    model_config = ConfigDict(json_encoders={Decimal: str})
+    @field_serializer('value_hkd')
+    def serialize_decimal(self, value: Decimal) -> str:
+        return str(value)
 
 
 class MonthlyNAV(BaseModel):
@@ -34,6 +36,14 @@ class MonthlyNAV(BaseModel):
     total_nav_hkd: Decimal
     by_broker: dict[str, BrokerValue]
     by_asset_type: dict[str, Decimal]
+
+    @field_serializer('total_nav_hkd')
+    def serialize_nav(self, value: Decimal) -> str:
+        return str(value)
+
+    @field_serializer('by_asset_type')
+    def serialize_asset_type(self, value: dict[str, Decimal]) -> dict[str, str]:
+        return {k: str(v) for k, v in value.items()}
 
 
 class PositionChange(BaseModel):

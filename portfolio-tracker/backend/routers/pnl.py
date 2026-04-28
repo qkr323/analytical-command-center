@@ -10,7 +10,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 from database import get_db
 from models.account import Account
@@ -35,6 +35,10 @@ class BrokerPnlOut(BaseModel):
     data_quality: str
     warnings: list[str]
 
+    @field_serializer('realized_trading_pnl_hkd', 'unrealized_pnl_hkd', 'estimated_total_trading_pnl_hkd', 'dividend_income_hkd', 'fees_hkd')
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        return str(value) if value is not None else None
+
 
 class PnlTotals(BaseModel):
     realized_trading_pnl_hkd: Decimal | None
@@ -43,6 +47,10 @@ class PnlTotals(BaseModel):
     dividend_income_hkd: Decimal | None
     fees_hkd: Decimal | None
     calculation_warnings: list[str]
+
+    @field_serializer('realized_trading_pnl_hkd', 'unrealized_pnl_hkd', 'estimated_total_trading_pnl_hkd', 'dividend_income_hkd', 'fees_hkd')
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        return str(value) if value is not None else None
 
 
 class PnlSummary(BaseModel):
