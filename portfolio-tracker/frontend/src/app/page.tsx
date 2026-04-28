@@ -8,6 +8,7 @@ import AllocationChart from '@/components/AllocationChart'
 import BrokerChart from '@/components/BrokerChart'
 import PositionTable from '@/components/PositionTable'
 import SyncPanel from '@/components/SyncPanel'
+import AiInsights from '@/components/AiInsights'
 import Link from 'next/link'
 
 function fmt(v: string | null) {
@@ -101,6 +102,9 @@ export default function DashboardPage() {
         <AllocationChart data={data.by_asset_type} />
         <BrokerChart data={data.by_broker} />
       </div>
+
+      {/* AI Insights */}
+      <AiInsights portfolio={data} />
 
       {/* Top Positions */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
