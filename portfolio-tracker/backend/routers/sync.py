@@ -144,16 +144,13 @@ async def sync_ibkr_xml(
 
 @router.post("/futu")
 async def sync_futu(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
-    """Pull latest data from Futu OpenD and upsert into DB."""
-
-    account = await db.scalar(select(Account).where(Account.broker == BrokerEnum.FUTU))
-    if not account:
-        raise HTTPException(404, "No Futu account found. Create one first via POST /accounts/")
-
-    try:
-        data = await fetch_futu_data()
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    """Futu sync via OpenD is not supported. Use sync_from_email.py instead."""
+    raise HTTPException(
+        400,
+        "Futu syncs via email statement (not OpenD). "
+        "Run 'python sync_from_email.py' from your Mac terminal. "
+        "See SYNC_INSTRUCTIONS.txt for details."
+    )
 
     snapshot_date = date.today()
     summary: dict[str, Any] = {

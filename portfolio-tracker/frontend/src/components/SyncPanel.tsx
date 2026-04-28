@@ -11,7 +11,6 @@ interface SyncBtn {
 
 const BUTTONS: SyncBtn[] = [
   { label: 'IBKR',    key: 'ibkr',    fn: api.syncIBKR    },
-  { label: 'Futu',    key: 'futu',    fn: api.syncFutu    },
   { label: 'Binance', key: 'binance', fn: api.syncBinance },
   { label: 'Prices',  key: 'prices',  fn: api.syncPrices  },
   { label: 'FX',      key: 'fx',      fn: api.syncFX      },
@@ -47,9 +46,7 @@ export default function SyncPanel({ onDone }: Props) {
     } catch (e: unknown) {
       const raw = (e as Error).message
       const text =
-        btn.key === 'futu' && raw.includes('not reachable')
-          ? 'Futu requires local sync — run from your Mac terminal (see SYNC_INSTRUCTIONS.txt).'
-          : btn.key === 'binance'
+        btn.key === 'binance'
           ? 'Binance requires local sync — run from your Mac terminal (see SYNC_INSTRUCTIONS.txt).'
           : `${btn.label} failed: ${raw}`
       setMessage({ text, ok: false })
@@ -89,7 +86,7 @@ export default function SyncPanel({ onDone }: Props) {
         </p>
       )}
       <p className="mt-3 text-xs text-slate-400">
-        OSL · Hang Seng · SoFi — synced via PDF upload or email. No sync button needed.
+        Futu · SoFi · OSL · Hang Seng — synced via PDF/email. Run: <code className="bg-slate-100 px-1 rounded">python sync_from_email.py</code>
       </p>
     </div>
   )
