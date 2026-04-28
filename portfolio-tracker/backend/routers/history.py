@@ -128,9 +128,6 @@ async def get_nav_history(db: AsyncSession = Depends(get_db)):
             )
 
         # Calculate total NAV (sum of all broker values)
-        total = sum(bv.value_hkd for bv in by_broker.values()) + sum(by_type.values()) - sum(by_broker.values())
-        # Actually: total should be sum of all brokers + sum of cash (if in by_type but not in by_broker)
-        # Simpler: just sum all broker values (which are already summed by date above)
         total = Decimal("0")
         for broker_vals in by_broker.values():
             total += broker_vals.value_hkd
