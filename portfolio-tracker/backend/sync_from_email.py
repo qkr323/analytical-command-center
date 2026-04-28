@@ -43,7 +43,7 @@ from googleapiclient.discovery import build
 
 load_dotenv(Path(__file__).parent / ".env")
 
-BACKEND_URL = "http://localhost:8001"
+BACKEND_URL = "http://localhost:8000"
 API_KEY = os.environ.get("API_SECRET", "")
 
 # Gmail OAuth2 scope — modify allows labelling processed emails
@@ -174,8 +174,9 @@ def main():
         requests.get(f"{BACKEND_URL}/health", timeout=5)
     except requests.exceptions.ConnectionError:
         sys.exit(
-            "[ERROR] Local backend not reachable at http://localhost:8001\n"
-            "Start it first: python -m uvicorn main:app --port 8001"
+            "[ERROR] Local backend not reachable at http://localhost:8000\n"
+            "Start it first: cd /Users/sampark/projects/portfolio-tracker && "
+            "python -m uvicorn main:app --reload --port 8000"
         )
 
     service = _get_service()
