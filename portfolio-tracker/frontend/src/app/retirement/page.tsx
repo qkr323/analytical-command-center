@@ -93,7 +93,7 @@ export default function RetirementPage() {
 
   const currentNavUSD = useMemo(() => currentNavHKD / USD_HKD_RATE, [currentNavHKD])
 
-  // Compute projection (50 years monthly, sample yearly)
+  // Compute projection (44 years monthly, sample yearly - 2026 to 2070)
   const projection = useMemo(() => {
     const result: ProjectionPoint[] = []
     let balance = currentNavHKD
@@ -101,7 +101,7 @@ export default function RetirementPage() {
 
     const startYear = new Date().getFullYear()
 
-    for (let month = 0; month <= 50 * 12; month++) {
+    for (let month = 0; month <= 44 * 12; month++) {
       balance = balance * (1 + r_monthly) + monthlySavings
       if (month > 0 && month % 12 === 0 && includeBonus) {
         balance += bonusAmount
@@ -109,9 +109,11 @@ export default function RetirementPage() {
 
       // Sample yearly
       if (month > 0 && month % 12 === 0) {
-        const year = startYear + month / 12
+        const yearFromNow = month / 12
+        const calendarYear = startYear + yearFromNow
         result.push({
-          year: Math.round(year),
+          year: yearFromNow,
+          calendarYear: Math.round(calendarYear),
           valueHKD: balance,
           valueUSD: balance / USD_HKD_RATE,
         })
@@ -121,15 +123,14 @@ export default function RetirementPage() {
     return result
   }, [currentNavHKD, monthlySavings, annualReturn, includeBonus, bonusAmount])
 
-  const goalYear = useMemo(() => {
-    const found = projection.find(p => p.valueHKD >= TARGET_HKD)
-    return found?.year ?? null
+  const goalProjection = useMemo(() => {
+    return projection.find(p => p.valueHKD >= TARGET_HKD) ?? null
   }, [projection])
 
   const yearsToGoal = useMemo(() => {
-    if (!goalYear) return null
-    return goalYear - new Date().getFullYear()
-  }, [goalYear])
+    if (!goalProjection) return null
+    return Math.round(goalProjection.year)
+  }, [goalProjection])
 
   // Calculate actual allocation percentages
   const actualAlloc = useMemo(() => {
@@ -221,7 +222,7 @@ export default function RetirementPage() {
             <KpiCard
               label="Years to Goal"
               value={yearsToGoal ? `${yearsToGoal} yrs` : '–'}
-              sub={goalYear ? `Year ${goalYear}` : 'Not reached'}
+              sub={goalProjection ? `Year ${goalProjection.calendarYear}` : 'Not reached'}
               positive={yearsToGoal !== null && yearsToGoal <= 20}
             />
             <KpiCard
@@ -310,6 +311,10 @@ export default function RetirementPage() {
                   type="number"
                   stroke="#94a3b8"
                   style={{ fontSize: 12 }}
+                  tickFormatter={(yearFromNow) => {
+                    const year = new Date().getFullYear() + yearFromNow
+                    return year.toString()
+                  }}
                   label={{ value: 'Year', position: 'insideBottomRight', offset: -10 }}
                 />
                 <YAxis
@@ -332,12 +337,12 @@ export default function RetirementPage() {
                   strokeDasharray="5 5"
                   label={{ value: `USD 10M goal (HK$${(TARGET_HKD / 1_000_000).toFixed(0)}M)`, position: 'insideTopRight', offset: -5, fill: '#ea580c', fontSize: 11 }}
                 />
-                {goalYear && (
+                {goalProjection && (
                   <ReferenceLine
-                    x={goalYear}
+                    x={goalProjection.year}
                     stroke="#16a34a"
                     strokeDasharray="5 5"
-                    label={{ value: `Reach goal: Year ${goalYear}`, position: 'top', fill: '#16a34a', fontSize: 11 }}
+                    label={{ value: `Reach goal: Year ${goalProjection.calendarYear}`, position: 'top', fill: '#16a34a', fontSize: 11 }}
                   />
                 )}
                 <Area type="monotone" dataKey="valueHKD" stroke="#6366f1" fill="url(#colorValue)" />
