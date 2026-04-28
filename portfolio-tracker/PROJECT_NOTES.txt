@@ -1,7 +1,7 @@
 	========================================
   PORTFOLIO TRACKER — PROJECT NOTES
 ========================================
-Last updated: 2026-04-25
+Last updated: 2026-04-28
 
 
 WHAT IS THIS?
@@ -112,6 +112,40 @@ WHAT RUNS 24/7 (no action needed)
 WHAT YOU RUN MANUALLY (to sync positions)
 -------------------------------------------
   See SYNC_INSTRUCTIONS.txt
+
+
+QUICK REFERENCE: Sync Futu/SoFi from Gmail
+-------------------------------------------
+  Futu HK and SoFi HK send daily statement PDFs to your Gmail. Sync them with:
+
+  STEP 1: Start the backend (if not running)
+    cd /Users/sampark/projects/portfolio-tracker
+    python -m uvicorn main:app --reload --port 8000
+    (Keep this running in the background)
+
+  STEP 2: Sync positions from Gmail statements
+    cd /Users/sampark/projects/portfolio-tracker/backend
+    source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+    python sync_from_email.py
+
+  What happens:
+    ✓ Finds new Futu/SoFi statement emails (PDFs)
+    ✓ Downloads them
+    ✓ Uploads to backend and imports positions + trades
+    ✓ Labels emails "portfolio-synced" so they're not re-imported
+    ✓ Shows summary: "N positions, M transactions"
+
+  FIRST TIME ONLY:
+    - Browser will open to authenticate with Gmail
+    - Approve access (will save a token file for future use)
+    - Future runs won't need the browser
+
+  NO NEW EMAILS?
+    - All Futu/SoFi statements have been processed (labeled)
+    - Or no new statements have arrived yet
+    - Both are normal!
+
+  For more details (troubleshooting, cron jobs): See SYNC_INSTRUCTIONS.txt
 
 
 P&L ENGINE (average-cost method)
