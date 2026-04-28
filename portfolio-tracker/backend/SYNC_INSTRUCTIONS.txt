@@ -1,0 +1,181 @@
+========================================
+PORTFOLIO TRACKER — SYNC INSTRUCTIONS
+========================================
+
+This guide explains how to sync your broker positions into the portfolio tracker.
+
+
+BROKERS AND SYNC METHODS
+------------------------
+
+  IBKR    → Sync button (automatic via Flex API)
+  Futu    → Manual: python sync_from_email.py (daily PDF via Gmail)
+  SoFi    → Manual: python sync_from_email.py (daily PDF via Gmail)
+  Binance → Sync button from Mac terminal only (geoblocked on Railway)
+  OSL     → Manual PDF upload via web dashboard
+  Hang Seng → Manual PDF upload via web dashboard
+
+
+FUTU + SOFI SETUP (One-time)
+-----------------------------
+
+Futu HK and SoFi HK send daily statement PDFs to your Gmail. The script
+sync_from_email.py connects to Gmail, downloads these PDFs, and uploads
+them to the portfolio tracker.
+
+1. Gmail OAuth2 Setup (Google Cloud Console)
+   ─────────────────────────────────────────
+   a) Go to https://console.cloud.google.com
+   b) Create or select your "Portfolio Tracking" project
+   c) Enable the Gmail API
+      - Search for "Gmail API"
+      - Click "Enable"
+   d) Create OAuth 2.0 Desktop App credentials
+      - APIs & Services → Credentials
+      - Create Credential → OAuth 2.0 Client ID
+      - Choose "Desktop application"
+      - Download the JSON file
+   e) Save the file as: backend/gmail_credentials.json
+      (This file should NEVER be committed to git)
+
+2. Verify .env has API_SECRET
+   ──────────────────────────
+   Open backend/.env and confirm:
+     API_SECRET=<your_secret_key_from_config>
+
+3. Run sync_from_email.py (first time)
+   ──────────────────────────────────
+   Make sure the local backend is running:
+     cd /Users/sampark/projects/portfolio-tracker/backend
+     python -m uvicorn main:app --reload --port 8000
+
+   Then run the sync script (in another Terminal tab):
+     source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+     cd /Users/sampark/projects/portfolio-tracker/backend
+     python sync_from_email.py
+
+   → Your default browser will open for Gmail authentication
+   → Authenticate with sam.sanghyunpark@gmail.com
+   → A gmail_token.json file will be saved (never commit this)
+   → The script will find any unprocessed Futu/SoFi emails and upload them
+
+
+HOW SYNC_FROM_EMAIL.PY WORKS
+----------------------------
+
+Each time you run it:
+  1. Connects to Gmail (using stored token, no browser needed after first run)
+  2. Searches for unprocessed statement emails from:
+     - Futu HK (no_reply@stmt.futuhk.com)
+     - SoFi HK (no-reply@sofi.hk)
+  3. For each email:
+     - Extracts the PDF attachment
+     - Uploads it to the backend at /upload/statement
+     - Parses the PDF and imports positions + trades
+     - Labels the email "portfolio-synced" so it's not re-imported
+  4. Returns a summary: positions imported, transactions imported, etc.
+
+
+RUNNING IT REGULARLY
+-------------------
+
+Option A: Manual (recommended while testing)
+  ```
+  cd /Users/sampark/projects/portfolio-tracker/backend
+  source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+  python sync_from_email.py
+  ```
+
+Option B: Scheduled (cron job)
+  ```
+  crontab -e
+  # Add a line to run daily at 9:30am:
+  30 9 * * * cd /Users/sampark/projects/portfolio-tracker/backend && \
+    source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate && \
+    python sync_from_email.py >> /tmp/portfolio_sync.log 2>&1
+  ```
+
+Option C: Check logs
+  ```
+  tail -f /tmp/portfolio_sync.log
+  ```
+
+
+TROUBLESHOOTING
+---------------
+
+Q: "Local backend not reachable at http://localhost:8001"
+A: Make sure the backend is running:
+   cd /Users/sampark/projects/portfolio-tracker
+   python -m uvicorn main:app --reload --port 8000
+   (Note: the script expects port 8000, not 8001)
+
+Q: "API_SECRET not found in .env"
+A: Check that backend/.env has:
+   API_SECRET=<your_api_secret>
+   (You can find this in config.py or the backend source)
+
+Q: Browser doesn't open for Gmail auth
+A: The browser should open automatically. If it doesn't:
+   - Check your default browser settings
+   - You can manually visit the OAuth2 URL if needed
+   - Once authenticated, a gmail_token.json is saved for future runs
+
+Q: "No new statement emails found"
+A: This means:
+   - All Futu/SoFi statement emails have already been processed (labeled)
+   - Or no new statements have arrived yet
+   This is normal! The script only processes new emails.
+
+Q: Need to re-process emails that were already imported?
+A: In Gmail:
+   1. Find the email
+   2. Remove the "portfolio-synced" label
+   3. Run sync_from_email.py again
+
+
+SECURITY NOTES
+--------------
+
+Files that should NEVER be committed to git:
+  - backend/gmail_credentials.json (OAuth2 client secret)
+  - backend/gmail_token.json (OAuth2 access token)
+  - backend/.env (API keys, database password)
+
+These are protected by .gitignore but verify before pushing!
+
+
+IBKR SYNC (Automatic)
+---------------------
+
+IBKR data syncs automatically via the Flex API. You can also click the "IBKR"
+button in the dashboard to force a sync whenever needed.
+
+For manual upload of IBKR XML statements:
+  1. Download XML from Interactive Brokers
+  2. Click the gear icon or use: POST /upload/ibkr-xml with the XML file
+  3. Data will be imported and P&L will auto-recalculate
+
+
+BINANCE SYNC (Local-only)
+------------------------
+
+Binance is geoblocked on Railway's US/EU servers, so you must sync from your Mac:
+
+From your Mac terminal:
+  source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+  curl -X POST http://localhost:8000/sync/binance \
+    -H "X-API-Key: $(grep API_SECRET backend/.env | cut -d= -f2)"
+
+
+PRICES & FX RATES
+-----------------
+
+Prices refresh automatically every 30 minutes on the production backend.
+To refresh manually from the web dashboard, click "Prices" or "FX".
+
+These sync:
+  - Stock/ETF prices via yfinance
+  - Crypto prices via CoinGecko
+  - FX rates via frankfurter.app
+  Then recalculates all position values in HKD.
