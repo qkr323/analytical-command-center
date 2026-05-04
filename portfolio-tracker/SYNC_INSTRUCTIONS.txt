@@ -63,6 +63,24 @@ IBKR (automatic, no local app needed)
     API_KEY="9f5c7eb34194861330d08176b09050f4a33bf334e1e70915e2415bb4adc9c8bb"
     curl -X POST "http://localhost:8001/sync/ibkr" -H "X-API-Key: $API_KEY"
 
+  WHAT HAPPENS ON SYNC:
+    1. Positions and transactions are imported from IBKR Flex
+    2. Interest and dividend accruals are parsed (if enabled in the Flex query)
+    3. P&L is recalculated for all affected position groups
+    4. Historical price data is fetched for 30 days (yfinance + CoinGecko)
+    5. Position snapshots are rebuilt for the last 30 days (eliminates NAV dips on sync gaps)
+    6. All prices are converted to HKD using historical FX rates
+
+  IBKR FLEX QUERY SETUP (one-time):
+    To capture interest and dividend accruals, update your IBKR Flex query:
+    1. Go to https://clientportal.interactivebrokers.com → Flex Queries → Reports
+    2. Find your Portfolio query and click "edit"
+    3. Change period to "Last 30 Days" (important for history rebuild window)
+    4. Scroll down to "Interest Accruals" → check "Include Interest Accruals"
+    5. Scroll down to "Dividend Accruals" → check "Include Open Dividend Accruals"
+    6. Save and run the query
+    7. Future syncs will automatically import these accruals
+
 BINANCE (must run from Mac — geoblocked on Railway)
   Binance.com is blocked on Railway's cloud infrastructure (HTTP 451).
   Must sync via local backend on your Mac:
@@ -131,6 +149,20 @@ ONE-TIME SETUP — P&L Migration (run once against Railway DB)
   After this one-time setup, P&L is recalculated automatically on every sync.
 
 
+ONE-TIME SETUP — Accrual Tables (run once against Railway DB)
+--------------------------------------------------------------
+  Interest and dividend accruals are tracked in separate tables. Run this once
+  to create the tables:
+
+    cd /Users/sampark/projects/portfolio-tracker/backend
+    source /Users/sampark/projects/portfolio-tracker/.venv/bin/activate
+    python -m scripts.migrate_accruals
+
+  This is safe to re-run (uses CREATE TABLE IF NOT EXISTS).
+  After this setup, accruals are automatically imported on every IBKR sync
+  (assuming you've enabled them in the Flex query settings).
+
+
 LEGACY — Futu OpenD sync (no longer primary, kept for reference)
 -----------------------------------------------------------------
   Before the Gmail-based sync was built, Futu positions were synced via the
@@ -159,5 +191,11 @@ NOTES
 - Binance must be run from Mac terminal (HTTP 451 geoblock on Railway).
 - Hang Seng and OSL have no API — upload the monthly PDF statement manually.
 - P&L is recalculated automatically on every sync; use POST /pnl/recalculate to trigger manually.
+- History rebuild runs automatically on every IBKR/PDF sync:
+  → Reconstructs 30 days of position snapshots
+  → Eliminates NAV dips on days without sync data
+  → Forward-fills positions with historical prices
+  → This happens behind the scenes; no action needed from you
 - The website (Vercel + Railway) runs 24/7 — no Mac needs to be on to view it.
 - Gmail credentials: backend/gmail_credentials.json + gmail_token.json (gitignored).
+- To see interest and dividend accruals, enable them in IBKR Flex query settings (see IBKR section above).

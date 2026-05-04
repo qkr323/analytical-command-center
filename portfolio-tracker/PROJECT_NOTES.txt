@@ -29,8 +29,11 @@ FRONTEND PAGES (6 navigation tabs)
   Positions    — Full position list with currency, native value, HKD equivalent, unrealized P&L
   Transactions — Transaction history with filters (broker, type, currency, ticker, date range); paginated
   History      — Historical portfolio value chart (area chart + by-broker + by-asset-type); NOT P&L
+               — Now uses 30-day position snapshot rebuild: eliminates NAV dips on days without sync data
+               — Positions are forward-filled with historical prices from yfinance + CoinGecko
   P&L          — Estimated trading P&L: realized, unrealized, dividend income, fees; data quality badges
   Currency     — Currency exposure breakdown (assets vs cash vs total, per currency, pie chart)
+  Retirement   — AI Insights: retirement planning analysis, risk assessment, allocation advice
 
 
 TECH STACK
@@ -108,6 +111,10 @@ WHAT RUNS 24/7 (no action needed)
   - Railway backend (FastAPI + PostgreSQL)
   - Vercel frontend (Next.js)
   - Prices auto-refresh every 30 minutes on Railway
+  - Position history rebuild (30-day snapshot reconstruction) on every IBKR/PDF sync
+    → Eliminates NAV dips on days when no sync data was received
+    → Replays transactions and forward-fills with historical prices
+    → Automatically converts to HKD using historical FX rates
 
 WHAT YOU RUN MANUALLY (to sync positions)
 -------------------------------------------
@@ -148,6 +155,26 @@ QUICK REFERENCE: Sync Futu/SoFi from Gmail
   For more details (troubleshooting, cron jobs): See SYNC_INSTRUCTIONS.txt
 
 
+30-DAY POSITION HISTORY REBUILD
+---------------------------------
+  The History page chart would show artificial NAV dips on days when no sync data was received.
+  This is now fixed with automatic position snapshot reconstruction:
+
+  HOW IT WORKS:
+    1. On every IBKR/PDF sync, the system reconstructs the last 30 days of daily position snapshots
+    2. Deletes old snapshots for the rebuild window
+    3. Loads opening positions (from before the window) with historical prices
+    4. Replays all transactions during the window (buys, sells, transfers, dividends, fees)
+    5. For each day: forward-fills positions with historical prices from yfinance (stocks/ETFs) and CoinGecko (crypto)
+    6. Converts all prices to HKD using historical FX rates from frankfurter.app
+    7. Creates clean daily snapshots for the entire 30-day window
+
+  RESULT:
+    - Portfolio NAV chart now shows smooth curves with no artificial dips
+    - Historical prices used for days without broker sync data (weekend/holiday/no transaction days)
+    - Accurate position-weighted NAV even on days the broker didn't report
+
+
 P&L ENGINE (average-cost method)
 ----------------------------------
   The P&L engine calculates realized and unrealized trading P&L per position group (account_id, asset_id, currency).
@@ -181,8 +208,36 @@ P&L ENGINE (average-cost method)
   Manual recalculation: "Recalculate P&L" button on the P&L page, or curl command in SYNC_INSTRUCTIONS.txt.
 
 
-KNOWN QUIRKS
-------------
+ACCRUAL TRACKING (IBKR Flex)
+-----------------------------
+  Interest and dividend accruals are now parsed from IBKR Flex reports and stored separately.
+  This allows you to see earned but not-yet-received income per currency and per asset.
+
+  INTEREST ACCRUALS:
+    - Tracked per account and currency
+    - Captured when opening IBKR Flex: set query to "Last 30 Days" and enable "Interest Accruals" in the form
+    - Fields: starting_balance, interest_accrued, accrual_reversal, fx_translation, ending_balance
+
+  DIVIDEND ACCRUALS:
+    - Tracked per account, asset, and symbol
+    - Captured when opening IBKR Flex: enable "Open Dividend Accruals" in the query form
+    - Fields: quantity, ex_date, pay_date, gross_rate, gross_amount, tax, fee, net_amount
+
+  HOW TO ENABLE:
+    1. Go to https://clientportal.interactivebrokers.com → Flex Queries → Reports
+    2. Click "edit" on the Portfolio query
+    3. Set period to "Last 30 Days" (important for history rebuild)
+    4. Scroll to "Interest Accruals" section → check the "Include Interest Accruals" box
+    5. Scroll to "Dividend Accruals" section → check the "Include Open Dividend Accruals" box
+    6. Save and run the query
+    7. The next IBKR sync will automatically import these accruals
+
+  NOTE: Accruals are useful for understanding cash flow timing and expected income.
+  They do NOT affect the P&L calculation (only realized trades and dividends do).
+
+
+KNOWN QUIRKS & FIXES
+--------------------
   - HK stock prices sometimes fail in yfinance (ticker format issues) — prices show last known value
   - Futu daily PDF statements have long ETF names that wrap across lines — the parser handles this
     by detecting unclosed parentheses and joining with the next line before applying regex
@@ -196,6 +251,10 @@ KNOWN QUIRKS
     Migration script is safe to re-run (uses ADD COLUMN IF NOT EXISTS)
   - Futu P&L history is incomplete before Apr 2026 — older trades show partial quality; sells before full history
     are excluded from totals rather than showing misleading partial numbers
+  - History rebuild was failing with SQLAlchemy async errors (FIXED 2026-05-04):
+    → ORM objects were being accessed after their session expired
+    → Now extracts snapshot data into simple dicts while session is active
+    → Flush after deletes resolves unique constraint violations on re-imports
 
 
 HISTORY — WHAT WE TRIED AND WHY WE CHANGED
@@ -231,6 +290,13 @@ HISTORY — WHAT WE TRIED AND WHY WE CHANGED
 
 HISTORY — SESSION LOG
 ----------------------
+  2026-05-04: Fixed History page NAV dips. Added 30-day position history rebuild on every sync:
+              reconstructs daily snapshots by replaying transactions and forward-filling with historical
+              prices from yfinance/CoinGecko. Converts prices to HKD using historical FX rates.
+              Fixed SQLAlchemy async errors in history rebuild (ORM object expiration).
+              Added accrual tracking: interest_accruals and dividend_accruals models + IBKR Flex parser.
+              Restored AI Insights component on retirement page.
+
   2026-04-25: Added Transactions, History, Currency, and P&L pages. Added P&L engine (average-cost
               method, dual HKD running averages, data quality flags). Added 11 new transaction columns.
               Added migration script (backend/scripts/migrate_pnl_columns.py). Updated NavBar with active
