@@ -27,6 +27,8 @@ class Account(Base):
 
     positions: Mapped[list["Position"]] = relationship(back_populates="account", cascade="all, delete-orphan")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="account", cascade="all, delete-orphan")
+    interest_accruals: Mapped[list["InterestAccrual"]] = relationship(back_populates="account", cascade="all, delete-orphan")
+    dividend_accruals: Mapped[list["DividendAccrual"]] = relationship(back_populates="account", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Account {self.broker.value}:{self.name}>"

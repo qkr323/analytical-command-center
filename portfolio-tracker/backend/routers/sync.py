@@ -21,6 +21,7 @@ from models.compliance_review import ComplianceReview, ReviewStatusEnum
 from models.position import Position
 from models.position_snapshot import PositionSnapshot
 from models.transaction import Transaction, TransactionTypeEnum
+from models.accrual import InterestAccrual, DividendAccrual
 from services.brokers.ibkr_flex import fetch_flex_report, parse_flex_xml_bytes, _guess_asset_type as ibkr_guess_type
 from services.brokers.futu_opend import fetch_futu_data
 from services.brokers.binance_api import fetch_binance_data
@@ -29,6 +30,7 @@ from services.compliance import check_symbol
 from services.fx import convert_to_hkd, refresh_rates
 from routers.upload import _get_or_create_asset, _tx_fingerprint
 from services.parsers.base import RawTransaction
+from services.history_rebuild import rebuild_position_history
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
@@ -56,6 +58,8 @@ async def sync_ibkr(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
         "positions_updated": 0,
         "transactions_imported": 0,
         "transactions_skipped_duplicate": 0,
+        "interest_accruals_updated": 0,
+        "dividend_accruals_updated": 0,
         "flagged_for_review": [],
         "blocked": [],
         "legacy_hold": [],
@@ -80,7 +84,21 @@ async def sync_ibkr(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
         from services.pnl import recalculate_pnl_for_pairs
         await recalculate_pnl_for_pairs(db, pnl_pairs)
 
+    # Process interest accruals
+    for accrual in report.get("interest_accruals", []):
+        await _upsert_interest_accrual(db, account.id, accrual, snapshot_date, summary)
+
+    # Process dividend accruals
+    for div_accrual in report.get("dividend_accruals", []):
+        await _upsert_dividend_accrual(db, account.id, div_accrual, snapshot_date, summary)
+
     await db.commit()
+
+    # Rebuild position history for the last 30 days
+    rebuild_summary = await rebuild_position_history(db)
+    await db.commit()
+    summary["history_rebuilt"] = rebuild_summary
+
     summary.pop("_seen", None)
     return summary
 
@@ -116,6 +134,8 @@ async def sync_ibkr_xml(
         "positions_updated": 0,
         "transactions_imported": 0,
         "transactions_skipped_duplicate": 0,
+        "interest_accruals_updated": 0,
+        "dividend_accruals_updated": 0,
         "flagged_for_review": [],
         "blocked": [],
         "legacy_hold": [],
@@ -137,7 +157,21 @@ async def sync_ibkr_xml(
         from services.pnl import recalculate_pnl_for_pairs
         await recalculate_pnl_for_pairs(db, pnl_pairs)
 
+    # Process interest accruals
+    for accrual in report.get("interest_accruals", []):
+        await _upsert_interest_accrual(db, account.id, accrual, snapshot_date, summary)
+
+    # Process dividend accruals
+    for div_accrual in report.get("dividend_accruals", []):
+        await _upsert_dividend_accrual(db, account.id, div_accrual, snapshot_date, summary)
+
     await db.commit()
+
+    # Rebuild position history for the last 30 days
+    rebuild_summary = await rebuild_position_history(db)
+    await db.commit()
+    summary["history_rebuilt"] = rebuild_summary
+
     summary.pop("_seen", None)
     return summary
 
@@ -837,3 +871,103 @@ async def _upsert_snapshot(
             quantity=quantity, price_hkd=price_hkd, market_value_hkd=value_hkd,
             source_file=source,
         ))
+
+
+async def _upsert_interest_accrual(
+    db, account_id: int, accrual: dict, snapshot_date: date, summary: dict
+) -> None:
+    """Upsert accrued interest (overwrites previous snapshot for same date/currency)."""
+    currency = accrual["currency"]
+
+    existing = await db.scalar(
+        select(InterestAccrual).where(
+            InterestAccrual.account_id == account_id,
+            InterestAccrual.currency == currency,
+            InterestAccrual.snapshot_date == snapshot_date,
+        )
+    )
+
+    if existing:
+        existing.starting_balance = accrual["starting_accrual_balance"]
+        existing.interest_accrued = accrual["interest_accrued"]
+        existing.accrual_reversal = accrual["accrual_reversal"]
+        existing.fx_translation = accrual["fx_translation"]
+        existing.ending_balance = accrual["ending_accrual_balance"]
+        existing.synced_at = date.today()
+    else:
+        db.add(InterestAccrual(
+            account_id=account_id,
+            currency=currency,
+            starting_balance=accrual["starting_accrual_balance"],
+            interest_accrued=accrual["interest_accrued"],
+            accrual_reversal=accrual["accrual_reversal"],
+            fx_translation=accrual["fx_translation"],
+            ending_balance=accrual["ending_accrual_balance"],
+            snapshot_date=snapshot_date,
+            synced_at=date.today(),
+        ))
+
+    summary["interest_accruals_updated"] += 1
+
+
+async def _upsert_dividend_accrual(
+    db, account_id: int, div_accrual: dict, snapshot_date: date, summary: dict
+) -> None:
+    """Upsert upcoming dividend accrual (overwrites previous for same ex/pay dates)."""
+    asset, _ = await _get_or_create_asset(
+        db, div_accrual["symbol"], div_accrual.get("description"),
+        div_accrual["currency"], div_accrual["asset_category"]
+    )
+
+    # Parse date strings (format: YYYYMMDD)
+    ex_date = None
+    pay_date = None
+    if div_accrual.get("ex_date"):
+        try:
+            ex_date = datetime.strptime(div_accrual["ex_date"], "%Y%m%d").date()
+        except (ValueError, TypeError):
+            pass
+    if div_accrual.get("pay_date"):
+        try:
+            pay_date = datetime.strptime(div_accrual["pay_date"], "%Y%m%d").date()
+        except (ValueError, TypeError):
+            pass
+
+    existing = await db.scalar(
+        select(DividendAccrual).where(
+            DividendAccrual.account_id == account_id,
+            DividendAccrual.asset_id == asset.id,
+            DividendAccrual.ex_date == ex_date,
+            DividendAccrual.pay_date == pay_date,
+        )
+    )
+
+    if existing:
+        existing.quantity = div_accrual["quantity"]
+        existing.gross_rate = div_accrual["gross_rate"]
+        existing.gross_amount = div_accrual["gross_amount"]
+        existing.tax = div_accrual["tax"]
+        existing.fee = div_accrual["fee"]
+        existing.net_amount = div_accrual["net_amount"]
+        existing.synced_at = date.today()
+    else:
+        db.add(DividendAccrual(
+            account_id=account_id,
+            asset_id=asset.id,
+            symbol=div_accrual["symbol"],
+            description=div_accrual.get("description", ""),
+            currency=div_accrual["currency"],
+            asset_category=div_accrual.get("asset_category", ""),
+            quantity=div_accrual["quantity"],
+            ex_date=ex_date,
+            pay_date=pay_date,
+            gross_rate=div_accrual["gross_rate"],
+            gross_amount=div_accrual["gross_amount"],
+            tax=div_accrual["tax"],
+            fee=div_accrual["fee"],
+            net_amount=div_accrual["net_amount"],
+            snapshot_date=snapshot_date,
+            synced_at=date.today(),
+        ))
+
+    summary["dividend_accruals_updated"] += 1

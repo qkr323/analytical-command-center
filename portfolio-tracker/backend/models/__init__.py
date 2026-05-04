@@ -5,6 +5,7 @@ from .transaction import Transaction, TransactionTypeEnum
 from .fx_rate import FxRate
 from .compliance_review import ComplianceReview, ReviewStatusEnum
 from .position_snapshot import PositionSnapshot
+from .accrual import InterestAccrual, DividendAccrual
 
 __all__ = [
     "Account", "BrokerEnum",
@@ -14,4 +15,5 @@ __all__ = [
     "FxRate",
     "ComplianceReview", "ReviewStatusEnum",
     "PositionSnapshot",
+    "InterestAccrual", "DividendAccrual",
 ]

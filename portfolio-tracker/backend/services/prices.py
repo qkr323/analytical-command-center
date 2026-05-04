@@ -270,3 +270,176 @@ async def _fetch_coingecko_prices(cg_ids: list[str]) -> dict[str, Decimal]:
         for cg_id, info in data.items()
         if "usd" in info
     }
+
+
+# ── Historical price fetcher (for 30-day snapshot rebuild) ──────────────────────
+
+async def fetch_historical_prices(
+    db: AsyncSession,
+    asset_ids: list[int],
+    start_date,
+    end_date,
+) -> dict[int, dict]:
+    """
+    Fetch historical daily prices for a date range.
+
+    Returns: {asset_id: {date: price_in_native_currency}}
+    - yfinance: Stocks/ETFs via batch download
+    - CoinGecko: Crypto via range endpoint
+    - Bonds/Other: Empty (no public API — caller falls back to last known price)
+    """
+    from datetime import date as date_type
+
+    if not asset_ids:
+        return {}
+
+    # Load assets
+    result = await db.execute(select(Asset).where(Asset.id.in_(asset_ids)))
+    assets_by_id = {a.id: a for a in result.scalars().all()}
+
+    yf_assets: dict[str, int] = {}  # yf_symbol → asset_id
+    cg_assets: dict[str, int] = {}  # cg_id → asset_id
+
+    for aid in asset_ids:
+        if aid not in assets_by_id:
+            continue
+        asset = assets_by_id[aid]
+
+        # Route to appropriate fetcher
+        if asset.asset_type == AssetTypeEnum.CRYPTO:
+            underlying = asset.symbol[2:] if asset.symbol.startswith("LD") else asset.symbol
+            if underlying in _STABLECOINS:
+                continue  # Stablecoins always 1.0
+            cg_id = _COINGECKO_IDS.get(underlying)
+            if cg_id:
+                cg_assets[cg_id] = aid
+            continue
+
+        if asset.asset_type in (
+            AssetTypeEnum.BOND_UST,
+            AssetTypeEnum.BOND_UKT,
+            AssetTypeEnum.BOND_ACGB,
+        ):
+            continue  # Bonds — no public API
+
+        # yfinance
+        yf_sym = _to_yf_symbol(asset.symbol, asset.asset_type, asset.currency)
+        if yf_sym:
+            yf_assets[yf_sym] = aid
+
+    # Fetch in parallel
+    yf_prices, cg_prices = await asyncio.gather(
+        _fetch_yf_historical(list(yf_assets.keys()), start_date, end_date),
+        _fetch_coingecko_historical(list(cg_assets.keys()), start_date, end_date),
+    )
+
+    # Map back to asset_ids
+    result_by_asset: dict[int, dict] = {}
+
+    for yf_sym, prices_dict in yf_prices.items():
+        asset_id = yf_assets[yf_sym]
+        result_by_asset[asset_id] = prices_dict
+
+    for cg_id, prices_dict in cg_prices.items():
+        asset_id = cg_assets[cg_id]
+        result_by_asset[asset_id] = prices_dict
+
+    return result_by_asset
+
+
+async def _fetch_yf_historical(symbols: list[str], start_date, end_date) -> dict[str, dict]:
+    """Batch download historical prices from yfinance."""
+    if not symbols:
+        return {}
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _sync_yf_historical, symbols, start_date, end_date)
+
+
+def _sync_yf_historical(symbols: list[str], start_date, end_date) -> dict[str, dict]:
+    """Synchronous yfinance batch historical download."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.error("yfinance not installed")
+        return {}
+
+    result: dict[str, dict] = {}
+
+    try:
+        # Batch download: all tickers at once, one range query
+        data = yf.download(
+            symbols,
+            start=start_date,
+            end=end_date,
+            progress=False,
+            auto_adjust=True,
+        )
+
+        if data.empty:
+            return result
+
+        # Handle single ticker (data is a Series) vs. multiple (DataFrame)
+        if isinstance(data, __import__("pandas").Series):
+            # Single ticker
+            symbol = symbols[0]
+            prices_dict = {}
+            for date_idx, price in data.items():
+                if price and price > 0:
+                    prices_dict[date_idx.date()] = Decimal(str(round(float(price), 6)))
+            result[symbol] = prices_dict
+        else:
+            # Multiple tickers
+            for symbol in symbols:
+                prices_dict = {}
+                if symbol in data.columns:
+                    for date_idx, price in data[symbol].items():
+                        if price and price > 0:
+                            prices_dict[date_idx.date()] = Decimal(str(round(float(price), 6)))
+                result[symbol] = prices_dict
+
+    except Exception as e:
+        logger.warning("yfinance historical fetch error: %s", e)
+
+    return result
+
+
+async def _fetch_coingecko_historical(
+    cg_ids: list[str], start_date, end_date
+) -> dict[str, dict]:
+    """Fetch historical crypto prices from CoinGecko."""
+    if not cg_ids:
+        return {}
+
+    result: dict[str, dict] = {}
+
+    # Convert dates to Unix timestamps
+    from datetime import datetime
+    start_ts = int(datetime.combine(start_date, datetime.min.time()).timestamp())
+    end_ts = int(datetime.combine(end_date, datetime.max.time()).timestamp())
+
+    for cg_id in cg_ids:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart/range",
+                    params={
+                        "vs_currency": "usd",
+                        "from": start_ts,
+                        "to": end_ts,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+
+                prices_dict = {}
+                for timestamp_ms, price in data.get("prices", []):
+                    from datetime import datetime
+                    d = datetime.fromtimestamp(timestamp_ms / 1000).date()
+                    prices_dict[d] = Decimal(str(round(price, 6)))
+
+                result[cg_id] = prices_dict
+        except Exception as e:
+            logger.debug("CoinGecko historical fetch error for %s: %s", cg_id, e)
+            result[cg_id] = {}
+
+    return result

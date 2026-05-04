@@ -128,6 +128,8 @@ def _parse_flex_xml(xml_text: str) -> dict:
     positions = [_parse_position(el) for el in stmt.findall(".//OpenPosition")]
     trades = [_parse_trade(el) for el in stmt.findall(".//Trade")]
     cash = [_parse_cash(el) for el in stmt.findall(".//CashReportCurrency")]
+    interest_accruals = [_parse_interest_accrual(el) for el in stmt.findall(".//InterestAccrualsCurrency")]
+    dividend_accruals = [_parse_dividend_accrual(el) for el in stmt.findall(".//OpenDividendAccrual")]
 
     # Filter out None values from failed parses
     return {
@@ -135,6 +137,8 @@ def _parse_flex_xml(xml_text: str) -> dict:
         "positions": [p for p in positions if p],
         "trades": [t for t in trades if t],
         "cash": [c for c in cash if c],
+        "interest_accruals": [ia for ia in interest_accruals if ia],
+        "dividend_accruals": [da for da in dividend_accruals if da],
     }
 
 
@@ -193,6 +197,40 @@ def _parse_cash(el: ET.Element) -> dict | None:
     return {
         "currency": currency,
         "ending_cash": _decimal(el.get("endingCash", "0")),
+    }
+
+
+def _parse_interest_accrual(el: ET.Element) -> dict | None:
+    currency = el.get("currency", "").strip()
+    if not currency or currency == "BASE_SUMMARY":
+        return None
+    return {
+        "currency": currency,
+        "starting_accrual_balance": _decimal(el.get("startingAccrualBalance", "0")),
+        "interest_accrued": _decimal(el.get("interestAccrued", "0")),
+        "accrual_reversal": _decimal(el.get("accrualReversal", "0")),
+        "fx_translation": _decimal(el.get("fxTranslation", "0")),
+        "ending_accrual_balance": _decimal(el.get("endingAccrualBalance", "0")),
+    }
+
+
+def _parse_dividend_accrual(el: ET.Element) -> dict | None:
+    symbol = el.get("symbol", "").strip()
+    if not symbol:
+        return None
+    return {
+        "symbol": symbol,
+        "description": el.get("description", ""),
+        "currency": el.get("currency", "USD"),
+        "asset_category": el.get("assetCategory", "STK"),
+        "quantity": _decimal(el.get("quantity", "0")),
+        "ex_date": el.get("exDate", ""),
+        "pay_date": el.get("payDate", ""),
+        "gross_rate": _decimal(el.get("grossRate", "0")),
+        "gross_amount": _decimal(el.get("grossAmount", "0")),
+        "tax": _decimal(el.get("tax", "0")),
+        "fee": _decimal(el.get("fee", "0")),
+        "net_amount": _decimal(el.get("netAmount", "0")),
     }
 
 

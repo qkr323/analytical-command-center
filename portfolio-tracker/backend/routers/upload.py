@@ -35,6 +35,7 @@ from services.compliance import check_symbol
 from services.fx import convert_to_hkd
 from services.parsers.base import RawPosition, RawTransaction
 from services.pdf_parser import parse_statement
+from services.history_rebuild import rebuild_position_history
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -101,6 +102,12 @@ async def upload_statement(
         await recalculate_pnl_for_pairs(db, pnl_pairs)
 
     await db.commit()
+
+    # Rebuild position history for the last 30 days
+    rebuild_summary = await rebuild_position_history(db)
+    await db.commit()
+    summary["history_rebuilt"] = rebuild_summary
+
     return summary
 
 

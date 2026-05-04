@@ -7,6 +7,7 @@ import {
 import { api } from '@/lib/api'
 import { PortfolioSummary } from '@/types/portfolio'
 import KpiCard from '@/components/KpiCard'
+import AiInsights from '@/components/AiInsights'
 
 const DEFAULT_TARGET_ALLOC: Record<string, number> = {
   etf_broad_index: 40,
@@ -437,6 +438,9 @@ export default function RetirementPage() {
             </table>
           </div>
         </div>
+
+        {/* AI Advisor Section */}
+        <AiInsights portfolio={summary} />
       </div>
     </div>
   )
