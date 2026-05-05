@@ -94,10 +94,10 @@ async def sync_ibkr(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
 
     await db.commit()
 
-    # Rebuild position history for the last 30 days
-    rebuild_summary = await rebuild_position_history(db)
-    await db.commit()
-    summary["history_rebuilt"] = rebuild_summary
+    # # Rebuild position history for the last 30 days
+    # rebuild_summary = await rebuild_position_history(db)
+    # await db.commit()
+    # summary["history_rebuilt"] = rebuild_summary
 
     summary.pop("_seen", None)
     return summary
@@ -167,10 +167,10 @@ async def sync_ibkr_xml(
 
     await db.commit()
 
-    # Rebuild position history for the last 30 days
-    rebuild_summary = await rebuild_position_history(db)
-    await db.commit()
-    summary["history_rebuilt"] = rebuild_summary
+    # # Rebuild position history for the last 30 days
+    # rebuild_summary = await rebuild_position_history(db)
+    # await db.commit()
+    # summary["history_rebuilt"] = rebuild_summary
 
     summary.pop("_seen", None)
     return summary
